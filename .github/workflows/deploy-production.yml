@@ -98,7 +98,11 @@ jobs:
           PRD_APP_DIR: ${{ secrets.PRD_APP_DIR }}
         run: |
           set -euo pipefail
-          ssh -F "$HOME/.ssh/config" production bash -s <<EOF
+          # Quoted heredoc so $(...) runs on the server, not the GitHub runner.
+          # PRD_APP_DIR is passed into the remote environment explicitly.
+          ssh -F "$HOME/.ssh/config" production \
+            env PRD_APP_DIR="${PRD_APP_DIR}" \
+            bash -s <<'EOF'
           set -euo pipefail
           cd "${PRD_APP_DIR}"
 
