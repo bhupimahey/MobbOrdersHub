@@ -8,8 +8,8 @@ const LOGO = '/mobb-logo.png'
 export default function LoginPage() {
   const { login, user, loading } = useAuth()
   const navigate = useNavigate()
-  const [email, setEmail] = useState('sanmehmi@gmail.com')
-  const [password, setPassword] = useState('sanmehmi')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
