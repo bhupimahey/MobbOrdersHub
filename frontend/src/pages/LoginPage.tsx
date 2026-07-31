@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, ArrowRight, ShieldCheck, Package, Truck } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 const LOGO = '/mobb-logo.png'
@@ -24,7 +24,6 @@ export default function LoginPage() {
     setSubmitting(true)
     try {
       await login(email, password)
-      // Navigate immediately — dashboard paints from cache / loads in parallel
       navigate('/dashboard', { replace: true })
     } catch (err: unknown) {
       const message =
@@ -40,14 +39,40 @@ export default function LoginPage() {
 
   return (
     <div className="login-page">
-      <div className="login-center">
-        <form className="login-card" onSubmit={(e) => void onSubmit(e)}>
-          <div className="login-card-top">
-            <div className="login-card-logo-wrap">
-              <img src={LOGO} alt="MOBB" className="login-card-logo" />
-            </div>
-            <h1>Welcome back</h1>
-            <p className="sub">Sign in to continue to your workspace</p>
+      <div className="login-atmosphere" aria-hidden="true" />
+
+      <aside className="login-brand">
+        <div className="login-brand-inner">
+          <img src={LOGO} alt="MOBB" className="login-brand-logo" />
+          <p className="login-brand-kicker">Proudly Canadian · Serving Canadians</p>
+          <h1 className="login-brand-title">MOBB</h1>
+          <p className="login-brand-tagline">
+            Orders Hub — the command center for fulfillment, shipping, and team workflow.
+          </p>
+
+          <ul className="login-brand-points">
+            <li>
+              <Package size={16} aria-hidden="true" />
+              <span>Track every order phase in real time</span>
+            </li>
+            <li>
+              <Truck size={16} aria-hidden="true" />
+              <span>Ship with confidence across Canada</span>
+            </li>
+            <li>
+              <ShieldCheck size={16} aria-hidden="true" />
+              <span>Secure access for your operations team</span>
+            </li>
+          </ul>
+        </div>
+      </aside>
+
+      <main className="login-panel">
+        <form className="login-form" onSubmit={(e) => void onSubmit(e)}>
+          <div className="login-form-top">
+            <p className="login-form-eyebrow">Team access</p>
+            <h2>Sign in</h2>
+            <p className="login-form-sub">Enter your work credentials to continue.</p>
           </div>
 
           {error && <div className="form-error">{error}</div>}
@@ -93,14 +118,13 @@ export default function LoginPage() {
             className="btn btn-primary login-submit"
             disabled={submitting}
           >
-            {submitting ? 'Signing in...' : 'Sign in to dashboard'}
+            <span>{submitting ? 'Signing in…' : 'Sign in to Orders Hub'}</span>
+            {!submitting && <ArrowRight size={16} aria-hidden="true" />}
           </button>
 
-          <div className="login-help">
-            Need access? Contact your Super Admin.
-          </div>
+          <p className="login-help">Need access? Contact your Super Admin.</p>
         </form>
-      </div>
+      </main>
     </div>
   )
 }
