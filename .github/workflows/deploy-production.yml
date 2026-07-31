@@ -1,0 +1,120 @@
+name: Deploy Production
+
+# Manual only — never runs automatically on push/commit
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build & rsync to production
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, ctype, json, bcmath, tokenizer, fileinfo, openssl, pdo_mysql
+          coverage: none
+          tools: composer:v2
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend into backend/public
+        working-directory: frontend
+        run: npm run build
+
+      - name: Install PHP dependencies (production)
+        working-directory: backend
+        run: composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
+
+      - name: Configure SSH
+        env:
+          PRD_SSH_KEY: ${{ secrets.PRD_SSH_KEY }}
+          PRD_HOST: ${{ secrets.PRD_HOST }}
+          PRD_USER: ${{ secrets.PRD_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$PRD_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$PRD_HOST" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          {
+            echo "Host production"
+            echo "  HostName ${PRD_HOST}"
+            echo "  User ${PRD_USER}"
+            echo "  IdentityFile ~/.ssh/deploy_key"
+            echo "  IdentitiesOnly yes"
+            echo "  StrictHostKeyChecking yes"
+          } > ~/.ssh/config
+          chmod 600 ~/.ssh/config
+
+      - name: Deploy with rsync
+        env:
+          PRD_APP_DIR: ${{ secrets.PRD_APP_DIR }}
+        run: |
+          set -euo pipefail
+
+          # --delete removes remote files that are gone locally, BUT excluded
+          # paths are never deleted (rsync does not use --delete-excluded).
+          # .env and backup_folder are never uploaded or removed on production.
+          rsync -az --delete \
+            -e "ssh -F $HOME/.ssh/config" \
+            --exclude='.env' \
+            --exclude='backup_folder/' \
+            --exclude='.git/' \
+            --exclude='node_modules/' \
+            --exclude='tests/' \
+            --exclude='.phpunit.result.cache' \
+            --exclude='phpunit.xml' \
+            --exclude='storage/logs/' \
+            --exclude='storage/framework/cache/' \
+            --exclude='storage/framework/sessions/' \
+            --exclude='storage/framework/views/' \
+            ./backend/ \
+            "production:${PRD_APP_DIR}/"
+
+      - name: Post-deploy (cache + migrate)
+        env:
+          PRD_APP_DIR: ${{ secrets.PRD_APP_DIR }}
+        run: |
+          set -euo pipefail
+          ssh -F "$HOME/.ssh/config" production bash -s <<EOF
+          set -euo pipefail
+          cd "${PRD_APP_DIR}"
+
+          # Never create or overwrite .env on production
+          if [ ! -f .env ]; then
+            echo "ERROR: .env is missing on production. Create it manually once, then re-run deploy."
+            exit 1
+          fi
+
+          # Ensure backup_folder always remains
+          mkdir -p backup_folder
+
+          php artisan migrate --force --no-interaction
+          php artisan config:cache
+          php artisan route:cache
+          php artisan view:cache
+
+          echo "Production deploy finished successfully."
+          EOF

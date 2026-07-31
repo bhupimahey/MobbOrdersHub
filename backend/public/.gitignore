@@ -1,0 +1,5 @@
+# Ignore Vite build output inside Laravel public (keep index.php / .htaccess)
+/backend/public/index.html
+/backend/public/assets/
+/backend/public/favicon.svg
+/backend/public/icons.svg

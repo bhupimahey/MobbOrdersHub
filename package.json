@@ -1,0 +1,9 @@
+{
+  "name": "san-orders-admin",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix frontend run build",
+    "start": "npm run build && php backend/artisan serve --host=127.0.0.1 --port=8000",
+    "serve": "php backend/artisan serve --host=127.0.0.1 --port=8000"
+  }
+}
