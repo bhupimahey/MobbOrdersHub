@@ -53,15 +53,27 @@ You do **not** need `npm run dev` on port 5173 for normal use.
 
 Orders are **not** stored permanently in MySQL.
 
-## cPanel / shared hosting
+## cPanel / shared hosting (orderhub.mobbmedical.com)
 
-Same setup as local (one app):
+Deploy uploads **only** `backend/` (React is already built into `backend/public/`).
 
-1. On your PC: `npm run build` (fills `backend/public` with the UI)
-2. Upload the `backend` folder to hosting
-3. Set document root to `backend/public` (or `public_html` = contents of `public`)
-4. Create MySQL DB in cPanel, update `.env`, run `php artisan migrate --seed` (SSH) or import SQL + seed
-5. Open `https://yourdomain.com`
+**GitHub secret `PRD_APP_DIR`** (Laravel app root — full website path):
+
+```text
+/home/univer62/public_html/orderhub.mobbmedical.com
+```
+
+That folder receives `app/`, `public/`, `vendor/`, etc. React lives in `public/index.html` + `public/assets/`.
+
+One-time on the server (cPanel File Manager or SSH):
+
+1. Create MySQL database + user in cPanel
+2. Copy `.env.production.example` → `.env` in the app root
+3. Fill `DB_*`, set `APP_URL=https://orderhub.mobbmedical.com`
+4. Generate key (SSH): `php artisan key:generate`
+5. Prefer document root → `.../orderhub.mobbmedical.com/public`  
+   If cPanel keeps document root on the domain folder, root `.htaccess` already forwards into `public/`
+6. Run **Actions → Deploy Production → Run workflow**
 
 ## Menus
 

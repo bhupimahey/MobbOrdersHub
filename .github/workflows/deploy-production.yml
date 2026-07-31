@@ -103,18 +103,23 @@ jobs:
           cd "${PRD_APP_DIR}"
 
           # Never create or overwrite .env on production
-          if [ ! -f .env ]; then
-            echo "ERROR: .env is missing on production. Create it manually once, then re-run deploy."
+          if [ ! -f .env ] || [ ! -s .env ]; then
+            echo "ERROR: .env is missing or empty on production."
+            echo "Create ${PRD_APP_DIR}/.env from .env.production.example (DB + APP_KEY), then re-run deploy."
             exit 1
           fi
 
           # Ensure backup_folder always remains
           mkdir -p backup_folder
+          mkdir -p storage/framework/{cache,sessions,views} storage/logs bootstrap/cache
+          chmod -R ug+rwx storage bootstrap/cache || true
 
           php artisan migrate --force --no-interaction
+          php artisan db:seed --force --no-interaction
+          php artisan storage:link || true
           php artisan config:cache
           php artisan route:cache
           php artisan view:cache
 
-          echo "Production deploy finished successfully."
+          echo "Production deploy finished successfully for ${PRD_APP_DIR}"
           EOF
