@@ -29,7 +29,8 @@ class DatabaseSeeder extends Seeder
             );
         }
 
-        User::query()->updateOrCreate(
+        // Create Super Admin once — never overwrite an existing password on re-seed
+        $admin = User::query()->firstOrCreate(
             ['email' => 'sanmehmi@gmail.com'],
             [
                 'name' => 'Super Admin',
@@ -40,6 +41,13 @@ class DatabaseSeeder extends Seeder
                 'is_active' => true,
             ]
         );
+
+        if (! $admin->wasRecentlyCreated) {
+            $admin->forceFill([
+                'role' => User::ROLE_SUPER_ADMIN,
+                'is_active' => true,
+            ])->save();
+        }
 
         $settings = [
             // Spire ERP (live)
@@ -101,8 +109,9 @@ class DatabaseSeeder extends Seeder
             ],
         ];
 
+        // Insert missing settings only — never overwrite live values (e.g. Spire credentials)
         foreach ($settings as $setting) {
-            Setting::query()->updateOrCreate(
+            Setting::query()->firstOrCreate(
                 ['key' => $setting['key']],
                 $setting
             );

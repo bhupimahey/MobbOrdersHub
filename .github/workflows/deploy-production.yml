@@ -115,7 +115,24 @@ jobs:
           chmod -R ug+rwx storage bootstrap/cache || true
 
           php artisan migrate --force --no-interaction
-          php artisan db:seed --force --no-interaction
+
+          # Seed only on first install (no users yet). Never re-seed on every deploy —
+          # that used to reset the Super Admin password and wipe Spire settings.
+          USER_COUNT="$(php -r '
+            require "vendor/autoload.php";
+            $app = require "bootstrap/app.php";
+            $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+            echo Illuminate\Support\Facades\Schema::hasTable("users")
+              ? (string) App\Models\User::query()->count()
+              : "0";
+          ')"
+          if [ "${USER_COUNT}" = "0" ]; then
+            echo "No users found — running initial db:seed"
+            php artisan db:seed --force --no-interaction
+          else
+            echo "Users already exist (${USER_COUNT}) — skipping db:seed"
+          fi
+
           php artisan storage:link || true
           php artisan config:cache
           php artisan route:cache
