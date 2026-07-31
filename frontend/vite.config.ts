@@ -5,7 +5,11 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const publicDir = path.resolve(__dirname, '../backend/public')
+const laravelPublicDir = path.resolve(__dirname, '../backend/public')
+const pagesOutDir = process.env.VITE_OUT_DIR
+  ? path.resolve(__dirname, process.env.VITE_OUT_DIR)
+  : null
+const outDir = pagesOutDir ?? laravelPublicDir
 
 // Build React into Laravel public/ so one server (php artisan serve / cPanel) serves both UI + API
 export default defineConfig({
@@ -15,15 +19,16 @@ export default defineConfig({
       name: 'clean-laravel-spa-assets',
       apply: 'build',
       buildStart() {
-        rmSync(path.join(publicDir, 'assets'), { recursive: true, force: true })
-        rmSync(path.join(publicDir, 'index.html'), { force: true })
+        if (pagesOutDir) return
+        rmSync(path.join(laravelPublicDir, 'assets'), { recursive: true, force: true })
+        rmSync(path.join(laravelPublicDir, 'index.html'), { force: true })
       },
     },
   ],
-  base: '/',
+  base: process.env.VITE_BASE || '/',
   build: {
-    outDir: publicDir,
-    emptyOutDir: false,
+    outDir,
+    emptyOutDir: Boolean(pagesOutDir),
     assetsDir: 'assets',
   },
   server: {
