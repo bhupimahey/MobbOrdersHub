@@ -84,6 +84,20 @@ class SpireApiClient
             ];
         }
 
+        $resolvedIp = $this->resolveHostIp();
+        if ($resolvedIp !== null && $this->isPrivateIp($resolvedIp)) {
+            return [
+                'success' => false,
+                'message' => 'Spire host resolves to private LAN IP '.$resolvedIp
+                    .' — that address is not reachable from GreenGeeks/the public internet, '
+                    .'even if IP 67.208.45.68 is whitelisted. Ask Spire/IT for a public hostname or public IP '
+                    .'(port TCP 10880) that routes from outside the office LAN, then update Spire Base URL. '
+                    .'Until then keep Mock Orders enabled on production/local.',
+                'resolved_ip' => $resolvedIp,
+                'base_url' => $this->baseUrl(),
+            ];
+        }
+
         try {
             $response = $this->get('/api/v2/companies/');
 
@@ -131,6 +145,7 @@ class SpireApiClient
                     .'.',
                 'company' => $this->company(),
                 'base_url' => $this->baseUrl(),
+                'resolved_ip' => $resolvedIp,
             ];
         } catch (\Throwable $e) {
             Log::error('Spire connection test exception', ['error' => $e->getMessage()]);
@@ -139,11 +154,11 @@ class SpireApiClient
             $friendly = 'Could not reach Spire API.';
 
             if (str_contains($msg, 'timed out') || str_contains($msg, 'Timeout') || str_contains($msg, 'Failed to connect')) {
-                $friendly = 'Connection timed out to '.$this->baseUrl()
-                    .' on port 10880. Spire is only reachable from an allowed network/IP '
-                    .'(office LAN/VPN, or GreenGeeks IP 67.208.45.68 after firewall approval). '
-                    .'Local testing from home usually cannot reach this host — keep Mock Orders enabled locally, '
-                    .'and test live Spire from the production server.';
+                $ipNote = $resolvedIp ? " (DNS currently resolves to {$resolvedIp})" : '';
+                $friendly = 'Connection timed out to '.$this->baseUrl().$ipNote
+                    .' on port 10880. Confirm Spire exposes a public IP/hostname (not only office LAN), '
+                    .'and that GreenGeeks outbound IP 67.208.45.68 is allowlisted for TCP 10880. '
+                    .'If you tested from your PC at home, that will still fail — test from production Settings.';
             } elseif (str_contains($msg, 'SSL') || str_contains($msg, 'certificate')) {
                 $friendly = 'SSL error talking to Spire. Keep “Verify Spire SSL Certificate” disabled if Spire uses a self-signed cert.';
             }
@@ -152,8 +167,38 @@ class SpireApiClient
                 'success' => false,
                 'message' => $friendly,
                 'detail' => $msg,
+                'resolved_ip' => $resolvedIp,
             ];
         }
+    }
+
+    private function resolveHostIp(): ?string
+    {
+        $host = parse_url($this->baseUrl(), PHP_URL_HOST);
+        if (! is_string($host) || $host === '') {
+            return null;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            return $host;
+        }
+
+        $ip = gethostbyname($host);
+
+        return ($ip !== $host && filter_var($ip, FILTER_VALIDATE_IP)) ? $ip : null;
+    }
+
+    private function isPrivateIp(string $ip): bool
+    {
+        if (! filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return false;
+        }
+
+        return ! filter_var(
+            $ip,
+            FILTER_VALIDATE_IP,
+            FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+        );
     }
 
     public function listSalesOrders(array $query = []): array
