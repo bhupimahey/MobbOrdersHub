@@ -15,14 +15,30 @@ class SettingController extends Controller
 
     public function index(): JsonResponse
     {
+        $preferredOrder = [
+            'spire_base_url',
+            'spire_company',
+            'spire_username',
+            'spire_password',
+            'spire_verify_ssl',
+            'use_mock_orders',
+            'app_name',
+        ];
+
         $settings = Setting::query()
             ->orderBy('group')
             ->orderBy('key')
             ->get()
+            ->sortBy(function (Setting $setting) use ($preferredOrder) {
+                $index = array_search($setting->key, $preferredOrder, true);
+
+                return $index === false ? 1000 : $index;
+            })
+            ->values()
             ->map(fn (Setting $setting) => [
                 'id' => $setting->id,
                 'key' => $setting->key,
-                'value' => $setting->is_encrypted ? null : $setting->decoded_value,
+                'value' => $setting->decoded_value,
                 'has_value' => $setting->value !== null && $setting->value !== '',
                 'type' => $setting->type,
                 'group' => $setting->group,

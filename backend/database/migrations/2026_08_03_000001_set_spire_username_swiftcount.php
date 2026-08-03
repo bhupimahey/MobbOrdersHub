@@ -11,7 +11,7 @@ return new class extends Migration
             'type' => 'string',
             'group' => 'spire',
             'label' => 'Spire Username',
-            'is_encrypted' => true,
+            'is_encrypted' => false,
         ]);
     }
 

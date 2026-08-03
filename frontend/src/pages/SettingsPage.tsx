@@ -28,6 +28,24 @@ type SpireTestResult = {
   base_url?: string
 }
 
+const SETTING_ORDER = [
+  'spire_base_url',
+  'spire_company',
+  'spire_username',
+  'spire_password',
+  'spire_verify_ssl',
+  'use_mock_orders',
+  'app_name',
+]
+
+function sortSettings(list: AppSetting[]): AppSetting[] {
+  return [...list].sort((a, b) => {
+    const ai = SETTING_ORDER.indexOf(a.key)
+    const bi = SETTING_ORDER.indexOf(b.key)
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
+  })
+}
+
 export default function SettingsPage() {
   const [settings, setSettings] = useState<AppSetting[]>([])
   const [values, setValues] = useState<Record<string, string>>({})
@@ -37,22 +55,24 @@ export default function SettingsPage() {
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<SpireTestResult | null>(null)
 
+  const applySettings = (list: AppSetting[]) => {
+    const ordered = sortSettings(list)
+    setSettings(ordered)
+    const map: Record<string, string> = {}
+    ordered.forEach((s) => {
+      if (typeof s.value === 'boolean') {
+        map[s.key] = s.value ? '1' : '0'
+      } else {
+        map[s.key] = s.value ?? ''
+      }
+    })
+    setValues(map)
+  }
+
   useEffect(() => {
     const load = async () => {
       const { data } = await api.get('/settings')
-      const list: AppSetting[] = data.data
-      setSettings(list)
-      const map: Record<string, string> = {}
-      list.forEach((s) => {
-        if (s.is_encrypted) {
-          map[s.key] = ''
-        } else if (typeof s.value === 'boolean') {
-          map[s.key] = s.value ? '1' : '0'
-        } else {
-          map[s.key] = s.value ?? ''
-        }
-      })
-      setValues(map)
+      applySettings(data.data)
     }
     void load()
   }, [])
@@ -70,13 +90,8 @@ export default function SettingsPage() {
         })),
       }
       const { data } = await api.put('/settings', payload)
-      setSettings(data.data)
+      applySettings(data.data)
       setMessage('Settings saved successfully.')
-      setValues((prev) => ({
-        ...prev,
-        spire_username: '',
-        spire_password: '',
-      }))
     } catch {
       setError('Failed to save settings.')
     } finally {
@@ -90,13 +105,13 @@ export default function SettingsPage() {
     setError('')
     setTestResult(null)
     try {
-      // Save first so test uses latest values (blank secrets are kept server-side)
-      await api.put('/settings', {
+      const { data: saved } = await api.put('/settings', {
         settings: settings.map((s) => ({
           key: s.key,
           value: values[s.key] ?? '',
         })),
       })
+      applySettings(saved.data)
       const { data } = await api.post<SpireTestResult>('/settings/test-spire')
       setTestResult(data)
       setMessage(data.message || 'Spire connection OK.')
@@ -166,14 +181,9 @@ export default function SettingsPage() {
                     </select>
                   ) : (
                     <input
-                      type={setting.is_encrypted ? 'password' : 'text'}
+                      type="text"
                       value={values[setting.key] ?? ''}
-                      autoComplete={setting.is_encrypted ? 'new-password' : 'off'}
-                      placeholder={
-                        setting.is_encrypted && setting.has_value
-                          ? '•••••••• (leave blank to keep)'
-                          : ''
-                      }
+                      autoComplete="off"
                       onChange={(e) => setValues({ ...values, [setting.key]: e.target.value })}
                     />
                   )}

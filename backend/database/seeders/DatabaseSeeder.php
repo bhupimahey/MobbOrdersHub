@@ -73,7 +73,7 @@ class DatabaseSeeder extends Seeder
                 'type' => 'string',
                 'group' => 'spire',
                 'label' => 'Spire Username',
-                'is_encrypted' => true,
+                'is_encrypted' => false,
             ],
             [
                 'key' => 'spire_password',
@@ -81,7 +81,7 @@ class DatabaseSeeder extends Seeder
                 'type' => 'string',
                 'group' => 'spire',
                 'label' => 'Spire Password',
-                'is_encrypted' => true,
+                'is_encrypted' => false,
             ],
             [
                 'key' => 'spire_verify_ssl',
