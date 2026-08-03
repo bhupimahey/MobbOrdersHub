@@ -46,7 +46,7 @@ class SpireApiClient
         return '/api/v2/companies/'.$this->company().($suffix !== '' ? '/'.$suffix : '');
     }
 
-    public function client(): PendingRequest
+    public function client(?int $timeout = null, ?int $connectTimeout = null): PendingRequest
     {
         $verifySsl = (bool) Setting::getValue('spire_verify_ssl', false);
 
@@ -54,8 +54,8 @@ class SpireApiClient
             ->withBasicAuth($this->username(), $this->password())
             ->acceptJson()
             ->asJson()
-            ->timeout(12)
-            ->connectTimeout(5)
+            ->timeout($timeout ?? 20)
+            ->connectTimeout($connectTimeout ?? 8)
             ->withOptions(['verify' => $verifySsl]);
     }
 
@@ -75,77 +75,189 @@ class SpireApiClient
         return (int) Cache::get('spire:cache_gen', 1);
     }
 
+    /**
+     * Deep office-network Spire probe (same idea as Magento sync: server must reach Spire).
+     * Always attempts the call — private LAN IPs work when this PHP process is on office network.
+     */
     public function testConnection(): array
     {
         if (! $this->configured()) {
             return [
                 'success' => false,
                 'message' => 'Spire settings are incomplete. Set base URL, company, username, and password.',
+                'steps' => [],
             ];
         }
 
+        $host = (string) parse_url($this->baseUrl(), PHP_URL_HOST);
+        $port = (int) (parse_url($this->baseUrl(), PHP_URL_PORT) ?: 10880);
         $resolvedIp = $this->resolveHostIp();
-        if ($resolvedIp !== null && $this->isPrivateIp($resolvedIp)) {
+        $onPrivateLan = $resolvedIp !== null && $this->isPrivateIp($resolvedIp);
+        $steps = [];
+
+        $steps[] = [
+            'name' => 'dns',
+            'label' => 'Resolve Spire host',
+            'ok' => $resolvedIp !== null,
+            'detail' => $resolvedIp
+                ? "{$host} → {$resolvedIp}".($onPrivateLan ? ' (office LAN)' : ' (public)')
+                : "Could not resolve {$host}",
+        ];
+
+        if ($resolvedIp === null) {
             return [
                 'success' => false,
-                'message' => 'Spire host resolves to private LAN IP '.$resolvedIp
-                    .' — that address is not reachable from GreenGeeks/the public internet, '
-                    .'even if IP 67.208.45.68 is whitelisted. Ask Spire/IT for a public hostname or public IP '
-                    .'(port TCP 10880) that routes from outside the office LAN, then update Spire Base URL. '
-                    .'Until then keep Mock Orders enabled on production/local.',
+                'message' => "Could not resolve Spire host \"{$host}\". Check Spire Base URL.",
+                'steps' => $steps,
+                'base_url' => $this->baseUrl(),
+                'company' => $this->company(),
+            ];
+        }
+
+        $tcpOk = $this->probeTcp($resolvedIp, $port, 5);
+        $steps[] = [
+            'name' => 'tcp',
+            'label' => "TCP connect {$resolvedIp}:{$port}",
+            'ok' => $tcpOk,
+            'detail' => $tcpOk
+                ? 'Port is reachable from this server'
+                : 'Port closed/unreachable from this server (need office network or VPN)',
+        ];
+
+        if (! $tcpOk) {
+            return [
+                'success' => false,
+                'message' => $onPrivateLan
+                    ? "Cannot reach Spire at {$resolvedIp}:{$port}. Spire is office-LAN only — run Orders Hub backend on office Wi‑Fi/VPN (same as Magento sync), then retry Test Spire Connection. GreenGeeks hosting cannot reach this LAN address."
+                    : "Cannot reach Spire at {$resolvedIp}:{$port}. Check firewall allowlist for this server’s outbound IP and that port {$port} is open.",
+                'steps' => $steps,
                 'resolved_ip' => $resolvedIp,
                 'base_url' => $this->baseUrl(),
+                'company' => $this->company(),
+                'office_lan_only' => $onPrivateLan,
             ];
         }
 
         try {
-            $response = $this->get('/api/v2/companies/');
+            $response = $this->client(20, 8)->get('/api/v2/companies/');
 
             if ($response->status() === 401 || $response->status() === 403) {
+                $steps[] = [
+                    'name' => 'auth',
+                    'label' => 'Basic Auth',
+                    'ok' => false,
+                    'detail' => 'HTTP '.$response->status().' — check Spire username/password',
+                ];
+
                 return [
                     'success' => false,
-                    'message' => 'Authentication failed. Check Spire username and password.',
+                    'message' => 'Reached Spire, but authentication failed. Check Spire username and password.',
                     'status' => $response->status(),
+                    'steps' => $steps,
+                    'resolved_ip' => $resolvedIp,
+                    'base_url' => $this->baseUrl(),
+                    'company' => $this->company(),
                 ];
             }
 
             if (! $response->successful()) {
-                Log::warning('Spire connection test failed', [
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                ]);
+                $steps[] = [
+                    'name' => 'api',
+                    'label' => 'API v2 /companies',
+                    'ok' => false,
+                    'detail' => 'HTTP '.$response->status(),
+                ];
 
                 return [
                     'success' => false,
-                    'message' => 'Spire API responded with HTTP '.$response->status().'. Check host, port, and firewall.',
+                    'message' => 'Spire API responded with HTTP '.$response->status().'. Check host, port, and API version (v2).',
                     'status' => $response->status(),
+                    'steps' => $steps,
+                    'resolved_ip' => $resolvedIp,
+                    'base_url' => $this->baseUrl(),
                 ];
             }
 
-            $orders = $this->get($this->companyPath('sales/orders/'), [
+            $steps[] = [
+                'name' => 'auth',
+                'label' => 'Basic Auth + API v2',
+                'ok' => true,
+                'detail' => 'Authenticated to Spire companies endpoint',
+            ];
+
+            $orders = $this->client(20, 8)->get($this->companyPath('sales/orders/'), [
                 'start' => 0,
-                'limit' => 1,
+                'limit' => 3,
             ]);
 
             if (! $orders->successful()) {
+                $steps[] = [
+                    'name' => 'orders',
+                    'label' => 'Company orders ('.$this->company().')',
+                    'ok' => false,
+                    'detail' => 'HTTP '.$orders->status(),
+                ];
+
                 return [
                     'success' => false,
                     'message' => 'Connected to Spire, but company "'.$this->company().'" orders failed (HTTP '.$orders->status().').',
                     'status' => $orders->status(),
+                    'steps' => $steps,
+                    'resolved_ip' => $resolvedIp,
+                    'base_url' => $this->baseUrl(),
+                    'company' => $this->company(),
                 ];
             }
 
-            self::flushOrderCache();
             $count = $orders->json('count');
+            $records = $orders->json('records') ?? [];
+            $sample = is_array($records) && $records !== [] ? $records[0] : null;
+            $sampleOrder = null;
+
+            if (is_array($sample)) {
+                $sampleOrder = [
+                    'id' => $sample['id'] ?? null,
+                    'order_no' => $sample['orderNo'] ?? null,
+                    'customer' => data_get($sample, 'customer.name')
+                        ?? data_get($sample, 'shippingAddress.name')
+                        ?? null,
+                    'customer_po' => $sample['customerPO'] ?? null,
+                    'order_date' => $sample['orderDate'] ?? $sample['created'] ?? null,
+                    'status' => $sample['status'] ?? null,
+                ];
+            }
+
+            $steps[] = [
+                'name' => 'orders',
+                'label' => 'Fetch sales orders + customer fields',
+                'ok' => true,
+                'detail' => ($count !== null ? "{$count} orders available" : 'Orders endpoint OK')
+                    .($sampleOrder['order_no'] ?? null
+                        ? '; sample #'.$sampleOrder['order_no']
+                            .($sampleOrder['customer'] ? ' / '.$sampleOrder['customer'] : '')
+                        : ''),
+            ];
+
+            self::flushOrderCache();
+
+            $message = 'Spire connection OK — API v2, company '.$this->company()
+                .($count !== null ? ", {$count} orders" : '')
+                .'.';
+
+            if ($onPrivateLan) {
+                $message .= ' Connected over office LAN. Live Spire only works while this backend runs on office network/VPN (Magento-style). Keep Mock Orders on for GreenGeeks hosting.';
+            }
 
             return [
                 'success' => true,
-                'message' => 'Connected to Spire successfully'
-                    .($count !== null ? " (orders available: {$count})" : '')
-                    .'.',
+                'message' => $message,
                 'company' => $this->company(),
                 'base_url' => $this->baseUrl(),
                 'resolved_ip' => $resolvedIp,
+                'office_lan_only' => $onPrivateLan,
+                'order_count' => $count,
+                'sample_order' => $sampleOrder,
+                'steps' => $steps,
             ];
         } catch (\Throwable $e) {
             Log::error('Spire connection test exception', ['error' => $e->getMessage()]);
@@ -154,20 +266,29 @@ class SpireApiClient
             $friendly = 'Could not reach Spire API.';
 
             if (str_contains($msg, 'timed out') || str_contains($msg, 'Timeout') || str_contains($msg, 'Failed to connect')) {
-                $ipNote = $resolvedIp ? " (DNS currently resolves to {$resolvedIp})" : '';
-                $friendly = 'Connection timed out to '.$this->baseUrl().$ipNote
-                    .' on port 10880. Confirm Spire exposes a public IP/hostname (not only office LAN), '
-                    .'and that GreenGeeks outbound IP 67.208.45.68 is allowlisted for TCP 10880. '
-                    .'If you tested from your PC at home, that will still fail — test from production Settings.';
+                $friendly = $onPrivateLan
+                    ? "Timed out reaching {$this->baseUrl()} ({$resolvedIp}:{$port}). You are not on the office network from this server. Open Orders Hub on an office PC (npm start / php artisan serve), turn Mock Orders off, save Spire credentials, then click Test Spire Connection again."
+                    : "Connection timed out to {$this->baseUrl()} on port {$port}. Check firewall and that this server can reach Spire.";
             } elseif (str_contains($msg, 'SSL') || str_contains($msg, 'certificate')) {
                 $friendly = 'SSL error talking to Spire. Keep “Verify Spire SSL Certificate” disabled if Spire uses a self-signed cert.';
             }
+
+            $steps[] = [
+                'name' => 'api',
+                'label' => 'HTTPS API call',
+                'ok' => false,
+                'detail' => $msg,
+            ];
 
             return [
                 'success' => false,
                 'message' => $friendly,
                 'detail' => $msg,
                 'resolved_ip' => $resolvedIp,
+                'office_lan_only' => $onPrivateLan,
+                'steps' => $steps,
+                'base_url' => $this->baseUrl(),
+                'company' => $this->company(),
             ];
         }
     }
@@ -199,6 +320,21 @@ class SpireApiClient
             FILTER_VALIDATE_IP,
             FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
         );
+    }
+
+    private function probeTcp(string $ip, int $port, int $timeoutSeconds = 5): bool
+    {
+        $errno = 0;
+        $errstr = '';
+        $socket = @fsockopen($ip, $port, $errno, $errstr, $timeoutSeconds);
+
+        if (! is_resource($socket)) {
+            return false;
+        }
+
+        fclose($socket);
+
+        return true;
     }
 
     public function listSalesOrders(array $query = []): array

@@ -2,6 +2,32 @@ import { useEffect, useState, type FormEvent } from 'react'
 import api from '../api/client'
 import type { AppSetting } from '../types'
 
+type SpireTestStep = {
+  name: string
+  label: string
+  ok: boolean
+  detail?: string
+}
+
+type SpireTestResult = {
+  success?: boolean
+  message?: string
+  steps?: SpireTestStep[]
+  sample_order?: {
+    id?: string | number | null
+    order_no?: string | null
+    customer?: string | null
+    customer_po?: string | null
+    order_date?: string | null
+    status?: string | number | null
+  } | null
+  resolved_ip?: string | null
+  office_lan_only?: boolean
+  order_count?: number | null
+  company?: string
+  base_url?: string
+}
+
 export default function SettingsPage() {
   const [settings, setSettings] = useState<AppSetting[]>([])
   const [values, setValues] = useState<Record<string, string>>({})
@@ -9,6 +35,7 @@ export default function SettingsPage() {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<SpireTestResult | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -45,7 +72,6 @@ export default function SettingsPage() {
       const { data } = await api.put('/settings', payload)
       setSettings(data.data)
       setMessage('Settings saved successfully.')
-      // Clear password fields after save (keep placeholders)
       setValues((prev) => ({
         ...prev,
         spire_username: '',
@@ -62,20 +88,24 @@ export default function SettingsPage() {
     setTesting(true)
     setMessage('')
     setError('')
+    setTestResult(null)
     try {
-      // Save first so test uses latest values (except blank secrets)
+      // Save first so test uses latest values (blank secrets are kept server-side)
       await api.put('/settings', {
         settings: settings.map((s) => ({
           key: s.key,
           value: values[s.key] ?? '',
         })),
       })
-      const { data } = await api.post('/settings/test-spire')
+      const { data } = await api.post<SpireTestResult>('/settings/test-spire')
+      setTestResult(data)
       setMessage(data.message || 'Spire connection OK.')
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Spire connection test failed.'
+      const data = (err as { response?: { data?: SpireTestResult } })?.response?.data
+      if (data) {
+        setTestResult(data)
+      }
+      const msg = data?.message || 'Spire connection test failed.'
       setError(msg)
     } finally {
       setTesting(false)
@@ -122,11 +152,27 @@ export default function SettingsPage() {
               {group === 'spire' ? 'Spire ERP API' : group}
             </h3>
             {group === 'spire' && (
-              <p style={{ marginTop: 0, marginBottom: 14, color: '#6b7280', fontSize: 12.5 }}>
-                Base: https://square-sales-8907.spirelan.com:10880 · Company: MOB_MED2 · Auth: Basic
-                (username/password). Keep mock enabled until the firewall and credentials are
-                verified.
-              </p>
+              <div className="spire-help">
+                <p>
+                  <strong>Aligned with Spire:</strong> Base{' '}
+                  <code>https://square-sales-8907.spirelan.com:10880</code> · API <code>v2</code> ·
+                  Company <code>MOB_MED2</code> · Basic Auth.
+                </p>
+                <p>
+                  Spire is <strong>office-network only</strong> (same as Magento sync). Test Spire
+                  Connection runs from <em>this app’s server</em>, not your browser:
+                </p>
+                <ol>
+                  <li>On an office PC/Wi‑Fi (or VPN into the office), run Orders Hub locally.</li>
+                  <li>Enter Spire username/password, set Mock Orders to Disabled, Save.</li>
+                  <li>Click <strong>Test Spire Connection</strong> — it will DNS + TCP + auth + fetch a sample order/customer.</li>
+                </ol>
+                <p className="spire-help-note">
+                  GreenGeeks production cannot reach the office LAN Spire host. Keep Mock Orders
+                  enabled there until Spire is available from that server (or the backend runs in
+                  the office).
+                </p>
+              </div>
             )}
             {settings
               .filter((s) => s.group === group)
@@ -159,6 +205,46 @@ export default function SettingsPage() {
           </div>
         ))}
 
+        {testResult && (
+          <div className={`spire-test-result ${testResult.success ? 'ok' : 'bad'}`}>
+            <h4>{testResult.success ? 'Spire test passed' : 'Spire test failed'}</h4>
+            {(testResult.base_url || testResult.resolved_ip) && (
+              <p className="spire-test-meta">
+                {testResult.base_url}
+                {testResult.resolved_ip ? ` → ${testResult.resolved_ip}` : ''}
+                {testResult.company ? ` · ${testResult.company}` : ''}
+              </p>
+            )}
+            {Array.isArray(testResult.steps) && testResult.steps.length > 0 && (
+              <ul className="spire-test-steps">
+                {testResult.steps.map((step) => (
+                  <li key={step.name} className={step.ok ? 'ok' : 'bad'}>
+                    <span className="spire-step-mark">{step.ok ? '✓' : '✗'}</span>
+                    <div>
+                      <strong>{step.label}</strong>
+                      {step.detail && <div className="spire-step-detail">{step.detail}</div>}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {testResult.sample_order && (
+              <div className="spire-sample-order">
+                <strong>Sample order synced</strong>
+                <div>
+                  #{String(testResult.sample_order.order_no ?? testResult.sample_order.id ?? '—')}
+                  {testResult.sample_order.customer
+                    ? ` · ${testResult.sample_order.customer}`
+                    : ''}
+                  {testResult.sample_order.customer_po
+                    ? ` · PO ${testResult.sample_order.customer_po}`
+                    : ''}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button type="submit" className="btn btn-primary" disabled={saving}>
             {saving ? 'Saving...' : 'Save Settings'}
@@ -169,7 +255,7 @@ export default function SettingsPage() {
             onClick={() => void testSpire()}
             disabled={testing}
           >
-            {testing ? 'Testing...' : 'Test Spire Connection'}
+            {testing ? 'Testing Spire…' : 'Test Spire Connection'}
           </button>
         </div>
       </form>
