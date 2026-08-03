@@ -26,7 +26,7 @@ return new class extends Migration
             ],
             [
                 'key' => 'spire_username',
-                'value' => '',
+                'value' => 'Swiftcount',
                 'type' => 'string',
                 'group' => 'spire',
                 'label' => 'Spire Username',

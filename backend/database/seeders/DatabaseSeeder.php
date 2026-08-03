@@ -69,7 +69,7 @@ class DatabaseSeeder extends Seeder
             ],
             [
                 'key' => 'spire_username',
-                'value' => '',
+                'value' => 'Swiftcount',
                 'type' => 'string',
                 'group' => 'spire',
                 'label' => 'Spire Username',

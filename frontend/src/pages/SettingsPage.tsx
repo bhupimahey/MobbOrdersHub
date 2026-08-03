@@ -151,29 +151,6 @@ export default function SettingsPage() {
             >
               {group === 'spire' ? 'Spire ERP API' : group}
             </h3>
-            {group === 'spire' && (
-              <div className="spire-help">
-                <p>
-                  <strong>Aligned with Spire:</strong> Base{' '}
-                  <code>https://square-sales-8907.spirelan.com:10880</code> · API <code>v2</code> ·
-                  Company <code>MOB_MED2</code> · Basic Auth.
-                </p>
-                <p>
-                  Spire is <strong>office-network only</strong> (same as Magento sync). Test Spire
-                  Connection runs from <em>this app’s server</em>, not your browser:
-                </p>
-                <ol>
-                  <li>On an office PC/Wi‑Fi (or VPN into the office), run Orders Hub locally.</li>
-                  <li>Enter Spire username/password, set Mock Orders to Disabled, Save.</li>
-                  <li>Click <strong>Test Spire Connection</strong> — it will DNS + TCP + auth + fetch a sample order/customer.</li>
-                </ol>
-                <p className="spire-help-note">
-                  GreenGeeks production cannot reach the office LAN Spire host. Keep Mock Orders
-                  enabled there until Spire is available from that server (or the backend runs in
-                  the office).
-                </p>
-              </div>
-            )}
             {settings
               .filter((s) => s.group === group)
               .map((setting) => (
