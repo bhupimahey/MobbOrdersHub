@@ -9,10 +9,13 @@ type SpireTestStep = {
   detail?: string
 }
 
+type SpireLogEntry = Record<string, unknown>
+
 type SpireTestResult = {
   success?: boolean
   message?: string
   steps?: SpireTestStep[]
+  log?: SpireLogEntry[]
   sample_order?: {
     id?: string | number | null
     order_no?: string | null
@@ -26,6 +29,9 @@ type SpireTestResult = {
   order_count?: number | null
   company?: string
   base_url?: string
+  started_at?: string
+  finished_at?: string
+  detail?: string
 }
 
 const SETTING_ORDER = [
@@ -54,6 +60,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<SpireTestResult | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const applySettings = (list: AppSetting[]) => {
     const ordered = sortSettings(list)
@@ -104,6 +111,7 @@ export default function SettingsPage() {
     setMessage('')
     setError('')
     setTestResult(null)
+    setCopied(false)
     try {
       const { data: saved } = await api.put('/settings', {
         settings: settings.map((s) => ({
@@ -127,7 +135,20 @@ export default function SettingsPage() {
     }
   }
 
+  const copyLog = async () => {
+    if (!testResult) return
+    const text = JSON.stringify(testResult, null, 2)
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2000)
+    } catch {
+      setError('Could not copy log to clipboard.')
+    }
+  }
+
   const groups = Array.from(new Set(settings.map((s) => s.group)))
+  const logText = testResult ? JSON.stringify(testResult, null, 2) : ''
 
   return (
     <div className="listing-page">
@@ -145,6 +166,87 @@ export default function SettingsPage() {
           {testing ? 'Testing...' : 'Test Spire Connection'}
         </button>
       </div>
+
+      {(testing || testResult) && (
+        <div className={`spire-log-panel ${testResult?.success ? 'ok' : testResult ? 'bad' : ''}`}>
+          <div className="spire-log-header">
+            <div>
+              <h3>Spire connection log</h3>
+              <p>
+                {testing
+                  ? 'Calling Spire APIs…'
+                  : testResult?.success
+                    ? 'Test finished — share this log with Spire admin support'
+                    : 'Test finished with errors — share this log with Spire admin support'}
+              </p>
+            </div>
+            {testResult && (
+              <button type="button" className="btn btn-ghost" onClick={() => void copyLog()}>
+                {copied ? 'Copied' : 'Copy full log'}
+              </button>
+            )}
+          </div>
+
+          {testResult?.message && (
+            <div className={`spire-log-summary ${testResult.success ? 'ok' : 'bad'}`}>
+              {testResult.message}
+            </div>
+          )}
+
+          {Array.isArray(testResult?.steps) && testResult.steps.length > 0 && (
+            <ul className="spire-test-steps">
+              {testResult.steps.map((step) => (
+                <li key={step.name} className={step.ok ? 'ok' : 'bad'}>
+                  <span className="spire-step-mark">{step.ok ? '✓' : '✗'}</span>
+                  <div>
+                    <strong>{step.label}</strong>
+                    {step.detail && <div className="spire-step-detail">{step.detail}</div>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {Array.isArray(testResult?.log) &&
+            testResult.log
+              .filter((entry) => entry.step === 'http_request')
+              .map((entry, index) => {
+                const request = (entry.request ?? {}) as Record<string, unknown>
+                const response = (entry.response ?? {}) as Record<string, unknown>
+                return (
+                  <div className="spire-http-block" key={`http-${index}`}>
+                    <div className="spire-http-title">
+                      API call {index + 1}: {String(request.method ?? 'GET')}{' '}
+                      {String(request.url ?? '')}
+                    </div>
+                    <div className="spire-http-grid">
+                      <div>
+                        <h5>Request</h5>
+                        <pre>{JSON.stringify(request, null, 2)}</pre>
+                      </div>
+                      <div>
+                        <h5>
+                          Response{' '}
+                          {response.status != null ? `(HTTP ${String(response.status)})` : ''}
+                          {response.duration_ms != null
+                            ? ` · ${String(response.duration_ms)} ms`
+                            : ''}
+                        </h5>
+                        <pre>{JSON.stringify(response.body ?? response, null, 2)}</pre>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+
+          {testResult && (
+            <details className="spire-log-raw" open>
+              <summary>Full JSON log (for Spire admin)</summary>
+              <pre>{logText}</pre>
+            </details>
+          )}
+        </div>
+      )}
 
       <form className="page-card" onSubmit={(e) => void onSubmit(e)}>
         {message && (
@@ -191,46 +293,6 @@ export default function SettingsPage() {
               ))}
           </div>
         ))}
-
-        {testResult && (
-          <div className={`spire-test-result ${testResult.success ? 'ok' : 'bad'}`}>
-            <h4>{testResult.success ? 'Spire test passed' : 'Spire test failed'}</h4>
-            {(testResult.base_url || testResult.resolved_ip) && (
-              <p className="spire-test-meta">
-                {testResult.base_url}
-                {testResult.resolved_ip ? ` → ${testResult.resolved_ip}` : ''}
-                {testResult.company ? ` · ${testResult.company}` : ''}
-              </p>
-            )}
-            {Array.isArray(testResult.steps) && testResult.steps.length > 0 && (
-              <ul className="spire-test-steps">
-                {testResult.steps.map((step) => (
-                  <li key={step.name} className={step.ok ? 'ok' : 'bad'}>
-                    <span className="spire-step-mark">{step.ok ? '✓' : '✗'}</span>
-                    <div>
-                      <strong>{step.label}</strong>
-                      {step.detail && <div className="spire-step-detail">{step.detail}</div>}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {testResult.sample_order && (
-              <div className="spire-sample-order">
-                <strong>Sample order synced</strong>
-                <div>
-                  #{String(testResult.sample_order.order_no ?? testResult.sample_order.id ?? '—')}
-                  {testResult.sample_order.customer
-                    ? ` · ${testResult.sample_order.customer}`
-                    : ''}
-                  {testResult.sample_order.customer_po
-                    ? ` · PO ${testResult.sample_order.customer_po}`
-                    : ''}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button type="submit" className="btn btn-primary" disabled={saving}>
