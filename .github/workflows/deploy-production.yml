@@ -52,11 +52,39 @@ jobs:
           PRD_USER: ${{ secrets.PRD_USER }}
         run: |
           set -euo pipefail
+
+          if [ -z "${PRD_SSH_KEY:-}" ] || [ -z "${PRD_HOST:-}" ] || [ -z "${PRD_USER:-}" ]; then
+            echo "ERROR: Missing deploy secrets. Set PRD_SSH_KEY, PRD_HOST, and PRD_USER in the repo."
+            exit 1
+          fi
+
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           printf '%s\n' "$PRD_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "$PRD_HOST" >> ~/.ssh/known_hosts
+
+          # GreenGeeks / shared hosts can be briefly unreachable from GitHub runners.
+          : > ~/.ssh/known_hosts
+          ok=0
+          for attempt in 1 2 3 4 5; do
+            echo "ssh-keyscan attempt ${attempt}/5 for host…"
+            if ssh-keyscan -T 15 -H "$PRD_HOST" >> ~/.ssh/known_hosts 2>~/ssh-keyscan.err; then
+              if [ -s ~/.ssh/known_hosts ]; then
+                ok=1
+                break
+              fi
+            fi
+            echo "ssh-keyscan attempt ${attempt} failed:"
+            cat ~/ssh-keyscan.err || true
+            sleep $((attempt * 3))
+          done
+
+          if [ "$ok" -ne 1 ]; then
+            echo "ERROR: Could not reach ${PRD_HOST} on SSH (port 22) from GitHub Actions."
+            echo "Check host uptime, firewall/allowlist for GitHub runner IPs, and PRD_HOST secret."
+            exit 1
+          fi
+
           chmod 644 ~/.ssh/known_hosts
           {
             echo "Host production"
@@ -65,6 +93,8 @@ jobs:
             echo "  IdentityFile ~/.ssh/deploy_key"
             echo "  IdentitiesOnly yes"
             echo "  StrictHostKeyChecking yes"
+            echo "  ServerAliveInterval 30"
+            echo "  ConnectTimeout 30"
           } > ~/.ssh/config
           chmod 600 ~/.ssh/config
 
