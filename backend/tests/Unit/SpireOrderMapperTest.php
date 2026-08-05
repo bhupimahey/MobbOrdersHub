@@ -20,6 +20,7 @@ class SpireOrderMapperTest extends TestCase
             'modified' => '2026-08-05T16:01:35.255937',
             'trackingNo' => 'santest135',
             'shipDate' => null,
+            'requiredDate' => '2026-07-10',
             'invoiceNo' => null,
             'customer' => ['name' => 'TEST COMPANY (SAN)'],
             'items' => [
@@ -36,6 +37,7 @@ class SpireOrderMapperTest extends TestCase
         $this->assertSame(3, $mapped['current_phase_index']);
         $this->assertSame('2026-07-10 12:10', $mapped['order_date']);
         $this->assertSame('2026-08-05 16:01', $mapped['last_updated']);
+        $this->assertSame('2026-07-10 00:00', $mapped['shipping']['est_delivery']);
         $this->assertCount(1, $mapped['items']);
         $this->assertSame('T9012-BL-XS', $mapped['items'][0]['sku']);
     }

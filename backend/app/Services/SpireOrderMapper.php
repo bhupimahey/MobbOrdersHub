@@ -53,7 +53,7 @@ class SpireOrderMapper
         $tracking = trim((string) ($raw['trackingNo'] ?? ''));
         $carrier = trim((string) ($raw['shippingCarrier'] ?? ''));
         $weight = trim((string) ($raw['weight'] ?? ''));
-        $shipDate = $this->formatDisplayDate($raw['shipDate'] ?? $raw['requiredDate'] ?? null);
+        $shipDate = $this->formatDateTime($raw['shipDate'] ?? $raw['requiredDate'] ?? null);
 
         $shipping = null;
         if ($carrier !== '' || $tracking !== '' || $weight !== '') {
@@ -332,15 +332,4 @@ class SpireOrderMapper
         }
     }
 
-    private function formatDisplayDate(mixed $value): string
-    {
-        if (! $value) {
-            return '';
-        }
-        try {
-            return (new \DateTimeImmutable((string) $value))->format('M j, Y');
-        } catch (\Throwable) {
-            return (string) $value;
-        }
-    }
 }
