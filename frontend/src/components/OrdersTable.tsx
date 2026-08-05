@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react'
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import api from '../api/client'
 import type { Order, OrderItem } from '../types'
 import { PHASES_META, phaseColor, phaseLabel } from '../types'
@@ -102,42 +103,45 @@ function OrderItemsPanel({
         )}
       </div>
 
-      {itemsModalOpen ? (
-        <div
-          className="modal-backdrop"
-          onClick={() => setItemsModalOpen(false)}
-          role="presentation"
-        >
-          <div
-            className="modal modal-items"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="order-items-modal-title"
-          >
-            <div className="modal-json-header">
-              <div>
-                <h2 id="order-items-modal-title">Order Items</h2>
-                <p>
-                  {orderNumber} · {visibleItems.length} line item
-                  {visibleItems.length === 1 ? '' : 's'}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn btn-icon btn-ghost"
-                onClick={() => setItemsModalOpen(false)}
-                aria-label="Close"
+      {itemsModalOpen
+        ? createPortal(
+            <div
+              className="modal-backdrop"
+              onClick={() => setItemsModalOpen(false)}
+              role="presentation"
+            >
+              <div
+                className="modal modal-items"
+                onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="order-items-modal-title"
               >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="modal-items-body">
-              <OrderItemsTable items={visibleItems} />
-            </div>
-          </div>
-        </div>
-      ) : null}
+                <div className="modal-json-header">
+                  <div>
+                    <h2 id="order-items-modal-title">Order Items</h2>
+                    <p>
+                      {orderNumber} · {visibleItems.length} line item
+                      {visibleItems.length === 1 ? '' : 's'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-icon btn-ghost"
+                    onClick={() => setItemsModalOpen(false)}
+                    aria-label="Close"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+                <div className="modal-items-body">
+                  <OrderItemsTable items={visibleItems} />
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   )
 }
