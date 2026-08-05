@@ -1,6 +1,5 @@
 import {
   Check,
-  CircleDashed,
   ClipboardList,
   Copy,
   FileCode2,
@@ -20,35 +19,6 @@ import { PHASES_META, phaseColor, phaseLabel } from '../types'
 
 const ITEMS_PREVIEW_LIMIT = 4
 
-function itemStatusLabel(status: string): string {
-  const raw = status.trim()
-  if (!raw) return 'Unknown'
-  return raw
-    .replace(/[_-]+/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase())
-}
-
-function ItemStatusIcon({ status }: { status: string }) {
-  const key = status.trim().toLowerCase()
-  const label = itemStatusLabel(status)
-  let Icon = CircleDashed
-  let className = 'item-status-icon item-status-pending'
-
-  if (key === 'done' || key === 'completed' || key === 'complete') {
-    Icon = Check
-    className = 'item-status-icon item-status-done'
-  } else if (key === 'in_progress' || key === 'in-progress' || key === 'progress') {
-    Icon = Package
-    className = 'item-status-icon item-status-progress'
-  }
-
-  return (
-    <span className={className} title={label} aria-label={label}>
-      <Icon size={15} strokeWidth={2.25} />
-    </span>
-  )
-}
-
 function OrderItemsTable({ items }: { items: OrderItem[] }) {
   return (
     <table className="order-items-table">
@@ -58,7 +28,6 @@ function OrderItemsTable({ items }: { items: OrderItem[] }) {
           <th className="col-qty">Ord.</th>
           <th className="col-qty">Picked</th>
           <th className="col-qty">Packed</th>
-          <th className="col-status">Status</th>
         </tr>
       </thead>
       <tbody>
@@ -68,9 +37,6 @@ function OrderItemsTable({ items }: { items: OrderItem[] }) {
             <td className="col-qty">{item.ordered}</td>
             <td className="col-qty">{item.picked}</td>
             <td className="col-qty">{item.packed}</td>
-            <td className="col-status">
-              <ItemStatusIcon status={item.status} />
-            </td>
           </tr>
         ))}
       </tbody>

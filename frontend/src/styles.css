@@ -1128,12 +1128,12 @@ table.data tbody tr.expanded {
 }
 
 .order-items-table .col-item {
-  width: auto;
+  width: 70%;
   word-break: break-word;
 }
 
 .order-items-table .col-qty {
-  width: 52px;
+  width: 10%;
   text-align: center;
   white-space: nowrap;
 }
@@ -1142,70 +1142,6 @@ table.data tbody tr.expanded {
 .order-items-table td.col-qty {
   text-align: center;
   padding-right: 4px;
-}
-
-.order-items-table .col-status {
-  width: 52px;
-  text-align: center;
-  white-space: nowrap;
-}
-
-.order-items-table th.col-status,
-.order-items-table td.col-status {
-  text-align: center;
-  padding-right: 0;
-}
-
-.item-status-icon {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  cursor: default;
-}
-
-.item-status-icon::after {
-  content: attr(aria-label);
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 6px);
-  transform: translateX(-50%) translateY(2px);
-  padding: 4px 8px;
-  border-radius: 6px;
-  background: #0f172a;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.12s ease, transform 0.12s ease;
-  z-index: 5;
-}
-
-.item-status-icon:hover::after,
-.item-status-icon:focus-visible::after {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-
-.item-status-done {
-  color: #15803d;
-  background: #dcfce7;
-}
-
-.item-status-progress {
-  color: #c2410c;
-  background: #ffedd5;
-}
-
-.item-status-pending {
-  color: #64748b;
-  background: #f1f5f9;
 }
 
 .items-empty {
@@ -1245,7 +1181,7 @@ table.data tbody tr.expanded {
 }
 
 .modal-items {
-  width: min(720px, 100%);
+  width: min(860px, 100%);
   max-height: min(90vh, 820px);
   display: flex;
   flex-direction: column;
@@ -1258,6 +1194,14 @@ table.data tbody tr.expanded {
 
 .modal-items .order-items-table {
   font-size: 13px;
+}
+
+.modal-items .order-items-table .col-item {
+  width: 76%;
+}
+
+.modal-items .order-items-table .col-qty {
+  width: 8%;
 }
 
 .detail-card-shipping,
