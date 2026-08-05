@@ -191,21 +191,21 @@ class SpireOrderMapper
             return self::PHASES[$idx] ?? null;
         }
 
+        // Longer phrases first so "shipping preparation" does not match bare "ship".
         $aliases = [
-            'received' => 'received',
-            'order received' => 'received',
-            'ready to pick' => 'ready_to_pick',
-            'ready for pick' => 'ready_to_pick',
-            'picked packed' => 'picked_packed',
-            'picked and packed' => 'picked_packed',
-            'pick packed' => 'picked_packed',
             'shipping preparation' => 'shipping_preparation',
             'shipping prep' => 'shipping_preparation',
             'ship preparation' => 'shipping_preparation',
+            'picked and packed' => 'picked_packed',
+            'picked packed' => 'picked_packed',
+            'pick packed' => 'picked_packed',
+            'ready to pick' => 'ready_to_pick',
+            'ready for pick' => 'ready_to_pick',
+            'order received' => 'received',
+            'received' => 'received',
             'invoiced' => 'invoiced',
             'invoice' => 'invoiced',
             'shipped' => 'shipped',
-            'ship' => 'shipped',
             'completed' => 'completed',
             'complete' => 'completed',
             'closed' => 'completed',

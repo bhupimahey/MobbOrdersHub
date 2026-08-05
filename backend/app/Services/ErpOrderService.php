@@ -69,7 +69,12 @@ class ErpOrderService
             ];
         }
 
-        $orders = $this->mapper->mapList($result['records'] ?? []);
+        $records = $result['records'] ?? [];
+        // Map with embedded items when Spire list includes them (detail JSON does).
+        $orders = array_map(
+            fn (array $row) => $this->mapper->mapOrder($row, $row['items'] ?? []),
+            $records
+        );
         $filtered = $this->filterForUser($orders, $user, $filters);
         $spireCount = $result['count'] ?? null;
 
@@ -120,10 +125,14 @@ class ErpOrderService
             return null;
         }
 
+        // Bust list cache so the next orders listing remaps with latest phaseId.
+        SpireApiClient::flushOrderCache();
+
         return [
             'source' => 'spire',
             'order_id' => $raw['id'] ?? $orderId,
             'order_no' => $raw['orderNo'] ?? null,
+            'mapped_phase' => $this->mapper->mapOrder($raw, $raw['items'] ?? [])['current_phase'] ?? null,
             'order' => $raw,
         ];
     }

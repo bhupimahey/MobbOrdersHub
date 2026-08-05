@@ -473,7 +473,7 @@ class SpireApiClient
 
         $cacheKey = 'spire:orders:'.$this->cacheGen().':'.md5(json_encode($query).'|'.$this->company());
 
-        return Cache::remember($cacheKey, 45, function () use ($query) {
+        return Cache::remember($cacheKey, 15, function () use ($query) {
             $response = $this->get($this->companyPath('sales/orders/'), $query);
 
             if (! $response->successful()) {

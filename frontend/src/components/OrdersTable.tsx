@@ -141,6 +141,7 @@ function todayISO(): string {
 export { todayISO }
 
 export default function OrdersTable({ orders }: { orders: Order[] }) {
+  const [rows, setRows] = useState<Order[]>(orders)
   const [expanded, setExpanded] = useState<string | null>(orders[0]?.id ?? null)
   const [copied, setCopied] = useState(false)
   const [menuFor, setMenuFor] = useState<string | null>(null)
@@ -149,7 +150,14 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
   const [jsonLoading, setJsonLoading] = useState(false)
   const [jsonError, setJsonError] = useState('')
   const [jsonCopied, setJsonCopied] = useState(false)
+  const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const loadedDetails = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    setRows(orders)
+    loadedDetails.current = new Set()
+  }, [orders])
 
   useEffect(() => {
     if (!menuFor) return
@@ -168,6 +176,29 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
       document.removeEventListener('keydown', onKey)
     }
   }, [menuFor])
+
+  const loadOrderDetail = async (order: Order) => {
+    if (loadedDetails.current.has(order.id)) return
+    setDetailLoadingId(order.id)
+    try {
+      const { data } = await api.get(`/orders/${encodeURIComponent(order.id)}`)
+      const full = data.data as Order | undefined
+      if (full) {
+        loadedDetails.current.add(order.id)
+        setRows((prev) => prev.map((row) => (row.id === order.id ? { ...row, ...full } : row)))
+      }
+    } catch {
+      // keep list row as-is
+    } finally {
+      setDetailLoadingId(null)
+    }
+  }
+
+  const toggleExpand = (order: Order) => {
+    const next = expanded === order.id ? null : order.id
+    setExpanded(next)
+    if (next) void loadOrderDetail(order)
+  }
 
   const copyTracking = async (value: string) => {
     try {
@@ -230,14 +261,14 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
             </tr>
           </thead>
           <tbody>
-            {orders.map((order) => {
+            {rows.map((order) => {
               const open = expanded === order.id
               const menuOpen = menuFor === order.id
               return (
                 <Fragment key={order.id}>
                   <tr
                     className={`clickable ${open ? 'expanded' : ''}`}
-                    onClick={() => setExpanded(open ? null : order.id)}
+                    onClick={() => toggleExpand(order)}
                   >
                     <td><span className="order-link">{order.order_number}</span></td>
                     <td className="customer-name">{order.customer}</td>
@@ -295,6 +326,11 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
                         <div className="detail-grid">
                           <div className="detail-card detail-card-items">
                             <h5>Order Items ({order.items.length})</h5>
+                            {detailLoadingId === order.id && order.items.length === 0 ? (
+                              <div className="text-muted" style={{ fontSize: 12 }}>
+                                Loading items from Spire…
+                              </div>
+                            ) : null}
                             <table>
                               <thead>
                                 <tr>
@@ -308,7 +344,7 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
                               </thead>
                               <tbody>
                                 {order.items.map((item) => (
-                                  <tr key={item.sku}>
+                                  <tr key={`${item.sku}-${item.item}`}>
                                     <td>{item.item}</td>
                                     <td className="text-muted">{item.sku}</td>
                                     <td>{item.ordered}</td>
@@ -323,6 +359,13 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
                                     </td>
                                   </tr>
                                 ))}
+                                {order.items.length === 0 && detailLoadingId !== order.id && (
+                                  <tr>
+                                    <td colSpan={6} className="text-muted">
+                                      No line items returned for this order.
+                                    </td>
+                                  </tr>
+                                )}
                               </tbody>
                             </table>
                           </div>
@@ -395,7 +438,7 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
                 </Fragment>
               )
             })}
-            {orders.length === 0 && (
+            {rows.length === 0 && (
               <tr>
                 <td colSpan={9}>
                   <div className="empty">No orders found for your assigned phases.</div>
