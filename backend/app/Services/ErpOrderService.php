@@ -323,6 +323,11 @@ class ErpOrderService
             })->values();
         }
 
+        // Newest first (order date/time, then last updated).
+        $collection = $collection
+            ->sortByDesc(fn ($o) => (string) ($o['order_date'] ?? '').'|'.(string) ($o['last_updated'] ?? ''))
+            ->values();
+
         return [
             'data' => $collection->all(),
             'meta' => ['count' => $collection->count(), 'using_mock' => $this->useMock()],

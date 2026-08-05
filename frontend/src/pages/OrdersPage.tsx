@@ -76,7 +76,9 @@ export default function OrdersPage() {
     }
     if (dateFrom) list = list.filter((o) => orderDay(o.order_date) >= dateFrom)
     if (dateTo) list = list.filter((o) => orderDay(o.order_date) <= dateTo)
-    return list
+    return [...list].sort((a, b) =>
+      (b.order_date || '').localeCompare(a.order_date || ''),
+    )
   }, [allOrders, search, status, dateFrom, dateTo])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))

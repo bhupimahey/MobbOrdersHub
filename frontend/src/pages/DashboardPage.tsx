@@ -83,7 +83,7 @@ export default function DashboardPage() {
       list = list.filter((o) => orderDay(o.order_date) <= dateTo)
     }
     return [...list]
-      .sort((a, b) => orderDay(b.order_date).localeCompare(orderDay(a.order_date)))
+      .sort((a, b) => (b.order_date || '').localeCompare(a.order_date || ''))
       .slice(0, 10)
   }, [data, search, status, dateFrom, dateTo])
 
