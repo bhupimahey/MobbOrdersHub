@@ -5,7 +5,6 @@ import {
   Copy,
   FileCode2,
   FileText,
-  LoaderCircle,
   MoreVertical,
   Package,
   Scale,
@@ -39,7 +38,7 @@ function ItemStatusIcon({ status }: { status: string }) {
     Icon = Check
     className = 'item-status-icon item-status-done'
   } else if (key === 'in_progress' || key === 'in-progress' || key === 'progress') {
-    Icon = LoaderCircle
+    Icon = Package
     className = 'item-status-icon item-status-progress'
   }
 
@@ -79,6 +78,14 @@ function OrderItemsTable({ items }: { items: OrderItem[] }) {
   )
 }
 
+function isRealOrderItem(item: OrderItem): boolean {
+  const sku = item.sku?.trim() ?? ''
+  const name = item.item?.trim() ?? ''
+  if (!sku || sku === '—') return false
+  if (!name && Number(item.ordered) <= 0) return false
+  return true
+}
+
 function OrderItemsPanel({
   orderNumber,
   items,
@@ -89,8 +96,9 @@ function OrderItemsPanel({
   loading: boolean
 }) {
   const [itemsModalOpen, setItemsModalOpen] = useState(false)
-  const preview = items.slice(0, ITEMS_PREVIEW_LIMIT)
-  const hasMore = items.length > ITEMS_PREVIEW_LIMIT
+  const visibleItems = items.filter(isRealOrderItem)
+  const preview = visibleItems.slice(0, ITEMS_PREVIEW_LIMIT)
+  const hasMore = visibleItems.length > ITEMS_PREVIEW_LIMIT
 
   useEffect(() => {
     if (!itemsModalOpen) return
@@ -104,10 +112,10 @@ function OrderItemsPanel({
   return (
     <>
       <div className="detail-card detail-card-items">
-        <h5>Order Items ({items.length})</h5>
-        {loading && items.length === 0 ? (
+        <h5>Order Items ({visibleItems.length})</h5>
+        {loading && visibleItems.length === 0 ? (
           <div className="items-empty text-muted">Loading line items…</div>
-        ) : items.length === 0 ? (
+        ) : visibleItems.length === 0 ? (
           <div className="items-empty">
             <Package size={18} strokeWidth={1.75} />
             <p>No line items on this order yet.</p>
@@ -121,7 +129,7 @@ function OrderItemsPanel({
                 className="btn-load-more-items"
                 onClick={() => setItemsModalOpen(true)}
               >
-                Load more items ({items.length - ITEMS_PREVIEW_LIMIT} more)
+                Load more items ({visibleItems.length - ITEMS_PREVIEW_LIMIT} more)
               </button>
             ) : null}
           </>
@@ -145,7 +153,8 @@ function OrderItemsPanel({
               <div>
                 <h2 id="order-items-modal-title">Order Items</h2>
                 <p>
-                  {orderNumber} · {items.length} line item{items.length === 1 ? '' : 's'}
+                  {orderNumber} · {visibleItems.length} line item
+                  {visibleItems.length === 1 ? '' : 's'}
                 </p>
               </div>
               <button
@@ -158,7 +167,7 @@ function OrderItemsPanel({
               </button>
             </div>
             <div className="modal-items-body">
-              <OrderItemsTable items={items} />
+              <OrderItemsTable items={visibleItems} />
             </div>
           </div>
         </div>

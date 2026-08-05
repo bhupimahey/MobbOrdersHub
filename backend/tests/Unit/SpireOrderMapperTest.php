@@ -58,4 +58,45 @@ class SpireOrderMapperTest extends TestCase
 
         $this->assertSame('received', $mapped['current_phase']);
     }
+
+    public function test_skips_blank_and_comment_item_rows(): void
+    {
+        $mapper = new SpireOrderMapper;
+        $mapped = $mapper->mapOrder([
+            'id' => 2,
+            'orderNo' => 'E0007013-2',
+            'status' => 'O',
+            'orderDate' => '2026-03-02',
+            'created' => '2026-03-02T18:34:00',
+            'customer' => ['name' => 'Test'],
+            'items' => [
+                [
+                    'partNo' => 'ELINOR-BLK-M',
+                    'description' => 'Tall The Elinor Black M',
+                    'orderQty' => '2',
+                    'committedQty' => '0',
+                ],
+                [
+                    'partNo' => '',
+                    'description' => '',
+                    'orderQty' => '0',
+                ],
+                [
+                    'partNo' => null,
+                    'description' => 'BACK ORDER',
+                    'orderQty' => '0',
+                ],
+                [
+                    'partNo' => 'SKIP-ME',
+                    'description' => 'Suppressed line',
+                    'orderQty' => '1',
+                    'suppress' => true,
+                ],
+            ],
+        ]);
+
+        $this->assertCount(1, $mapped['items']);
+        $this->assertSame('Tall The Elinor Black M', $mapped['items'][0]['item']);
+        $this->assertSame('ELINOR-BLK-M', $mapped['items'][0]['sku']);
+    }
 }

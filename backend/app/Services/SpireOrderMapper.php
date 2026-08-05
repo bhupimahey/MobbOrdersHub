@@ -115,12 +115,28 @@ class SpireOrderMapper
             if (! is_array($item)) {
                 continue;
             }
+
+            // Skip Spire comment / spacer / suppressed rows (blank, "BACK ORDER", notes).
+            if (! empty($item['suppress'])) {
+                continue;
+            }
+
+            $partNo = trim((string) ($item['partNo'] ?? data_get($item, 'inventory.partNo', '')));
+            $description = trim((string) ($item['description'] ?? data_get($item, 'inventory.description', '')));
             $ordered = (float) ($item['orderQty'] ?? $item['qtyOrdered'] ?? $item['quantity'] ?? 0);
             $picked = (float) ($item['qtyShipped'] ?? $item['shipQty'] ?? $item['picked'] ?? 0);
             $packed = (float) ($item['qtyPacked'] ?? $item['packed'] ?? $picked);
+
+            // Real inventory lines have a part number. Comment-only rows do not.
+            if ($partNo === '') {
+                continue;
+            }
+
+            $label = $description !== '' ? $description : $partNo;
+
             $out[] = [
-                'item' => (string) ($item['description'] ?? $item['partNo'] ?? data_get($item, 'inventory.description', 'Item')),
-                'sku' => (string) ($item['partNo'] ?? data_get($item, 'inventory.partNo', '—')),
+                'item' => $label,
+                'sku' => $partNo,
                 'ordered' => $ordered,
                 'picked' => $picked,
                 'packed' => $packed,

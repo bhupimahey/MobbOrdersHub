@@ -1203,19 +1203,9 @@ table.data tbody tr.expanded {
   background: #ffedd5;
 }
 
-.item-status-progress svg {
-  animation: item-status-spin 1.1s linear infinite;
-}
-
 .item-status-pending {
   color: #64748b;
   background: #f1f5f9;
-}
-
-@keyframes item-status-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .items-empty {
