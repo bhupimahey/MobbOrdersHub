@@ -450,9 +450,9 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
             </div>
             {jsonLoading && <div className="empty">Loading Spire JSON…</div>}
             {jsonError && <div className="form-error">{jsonError}</div>}
-            {!jsonLoading && jsonPayload && (
+            {!jsonLoading && jsonPayload != null ? (
               <pre className="order-json-pre">{JSON.stringify(jsonPayload, null, 2)}</pre>
-            )}
+            ) : null}
           </div>
         </div>
       )}
