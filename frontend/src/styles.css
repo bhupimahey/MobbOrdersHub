@@ -1103,6 +1103,173 @@ table.data tbody tr.expanded {
   padding: 12px 14px;
 }
 
+.order-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 12.5px;
+}
+
+.order-items-table th,
+.order-items-table td {
+  padding: 7px 8px 7px 0;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.order-items-table th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.order-items-table .col-item {
+  width: auto;
+  word-break: break-word;
+}
+
+.order-items-table .col-qty {
+  width: 52px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.order-items-table th.col-qty,
+.order-items-table td.col-qty {
+  text-align: center;
+  padding-right: 4px;
+}
+
+.order-items-table .col-status {
+  width: 52px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.order-items-table th.col-status,
+.order-items-table td.col-status {
+  text-align: center;
+  padding-right: 0;
+}
+
+.item-status-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  cursor: default;
+}
+
+.item-status-icon::after {
+  content: attr(aria-label);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%) translateY(2px);
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #0f172a;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  z-index: 5;
+}
+
+.item-status-icon:hover::after,
+.item-status-icon:focus-visible::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.item-status-done {
+  color: #15803d;
+  background: #dcfce7;
+}
+
+.item-status-progress {
+  color: #c2410c;
+  background: #ffedd5;
+}
+
+.item-status-progress svg {
+  animation: item-status-spin 1.1s linear infinite;
+}
+
+.item-status-pending {
+  color: #64748b;
+  background: #f1f5f9;
+}
+
+@keyframes item-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.items-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 88px;
+  padding: 12px 8px;
+  color: var(--muted);
+  font-size: 12.5px;
+  text-align: center;
+}
+
+.items-empty p {
+  margin: 0;
+}
+
+.btn-load-more-items {
+  margin-top: 10px;
+  width: 100%;
+  border: 1px dashed var(--border);
+  background: #f8fafc;
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-load-more-items:hover {
+  background: #fff;
+  border-color: #cbd5e1;
+}
+
+.modal-items {
+  width: min(720px, 100%);
+  max-height: min(90vh, 820px);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-items-body {
+  overflow: auto;
+  min-height: 0;
+}
+
+.modal-items .order-items-table {
+  font-size: 13px;
+}
+
 .detail-card-shipping,
 .detail-card-timeline,
 .detail-card-additional {

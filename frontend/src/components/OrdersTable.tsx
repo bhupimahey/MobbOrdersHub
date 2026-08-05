@@ -1,9 +1,11 @@
 import {
   Check,
+  CircleDashed,
   ClipboardList,
   Copy,
   FileCode2,
   FileText,
+  LoaderCircle,
   MoreVertical,
   Package,
   Scale,
@@ -14,8 +16,156 @@ import {
 } from 'lucide-react'
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import api from '../api/client'
-import type { Order } from '../types'
+import type { Order, OrderItem } from '../types'
 import { PHASES_META, phaseColor, phaseLabel } from '../types'
+
+const ITEMS_PREVIEW_LIMIT = 4
+
+function itemStatusLabel(status: string): string {
+  const raw = status.trim()
+  if (!raw) return 'Unknown'
+  return raw
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function ItemStatusIcon({ status }: { status: string }) {
+  const key = status.trim().toLowerCase()
+  const label = itemStatusLabel(status)
+  let Icon = CircleDashed
+  let className = 'item-status-icon item-status-pending'
+
+  if (key === 'done' || key === 'completed' || key === 'complete') {
+    Icon = Check
+    className = 'item-status-icon item-status-done'
+  } else if (key === 'in_progress' || key === 'in-progress' || key === 'progress') {
+    Icon = LoaderCircle
+    className = 'item-status-icon item-status-progress'
+  }
+
+  return (
+    <span className={className} title={label} aria-label={label}>
+      <Icon size={15} strokeWidth={2.25} />
+    </span>
+  )
+}
+
+function OrderItemsTable({ items }: { items: OrderItem[] }) {
+  return (
+    <table className="order-items-table">
+      <thead>
+        <tr>
+          <th className="col-item">Item</th>
+          <th className="col-qty">Ord.</th>
+          <th className="col-qty">Picked</th>
+          <th className="col-qty">Packed</th>
+          <th className="col-status">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {items.map((item, index) => (
+          <tr key={`${item.sku}-${item.item}-${index}`}>
+            <td className="col-item">{item.item}</td>
+            <td className="col-qty">{item.ordered}</td>
+            <td className="col-qty">{item.picked}</td>
+            <td className="col-qty">{item.packed}</td>
+            <td className="col-status">
+              <ItemStatusIcon status={item.status} />
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+function OrderItemsPanel({
+  orderNumber,
+  items,
+  loading,
+}: {
+  orderNumber: string
+  items: OrderItem[]
+  loading: boolean
+}) {
+  const [itemsModalOpen, setItemsModalOpen] = useState(false)
+  const preview = items.slice(0, ITEMS_PREVIEW_LIMIT)
+  const hasMore = items.length > ITEMS_PREVIEW_LIMIT
+
+  useEffect(() => {
+    if (!itemsModalOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setItemsModalOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [itemsModalOpen])
+
+  return (
+    <>
+      <div className="detail-card detail-card-items">
+        <h5>Order Items ({items.length})</h5>
+        {loading && items.length === 0 ? (
+          <div className="items-empty text-muted">Loading line items…</div>
+        ) : items.length === 0 ? (
+          <div className="items-empty">
+            <Package size={18} strokeWidth={1.75} />
+            <p>No line items on this order yet.</p>
+          </div>
+        ) : (
+          <>
+            <OrderItemsTable items={preview} />
+            {hasMore ? (
+              <button
+                type="button"
+                className="btn-load-more-items"
+                onClick={() => setItemsModalOpen(true)}
+              >
+                Load more items ({items.length - ITEMS_PREVIEW_LIMIT} more)
+              </button>
+            ) : null}
+          </>
+        )}
+      </div>
+
+      {itemsModalOpen ? (
+        <div
+          className="modal-backdrop"
+          onClick={() => setItemsModalOpen(false)}
+          role="presentation"
+        >
+          <div
+            className="modal modal-items"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="order-items-modal-title"
+          >
+            <div className="modal-json-header">
+              <div>
+                <h2 id="order-items-modal-title">Order Items</h2>
+                <p>
+                  {orderNumber} · {items.length} line item{items.length === 1 ? '' : 's'}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-icon btn-ghost"
+                onClick={() => setItemsModalOpen(false)}
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-items-body">
+              <OrderItemsTable items={items} />
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
+  )
+}
 
 const PHASE_ICONS: Record<string, typeof Check> = {
   received: ClipboardList,
@@ -324,51 +474,11 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
                     <tr className="expanded-row">
                       <td colSpan={9}>
                         <div className="detail-grid">
-                          <div className="detail-card detail-card-items">
-                            <h5>Order Items ({order.items.length})</h5>
-                            {detailLoadingId === order.id && order.items.length === 0 ? (
-                              <div className="text-muted" style={{ fontSize: 12 }}>
-                                Loading items from Spire…
-                              </div>
-                            ) : null}
-                            <table>
-                              <thead>
-                                <tr>
-                                  <th>Item</th>
-                                  <th>SKU</th>
-                                  <th>Ord.</th>
-                                  <th>Picked</th>
-                                  <th>Packed</th>
-                                  <th>Status</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {order.items.map((item) => (
-                                  <tr key={`${item.sku}-${item.item}`}>
-                                    <td>{item.item}</td>
-                                    <td className="text-muted">{item.sku}</td>
-                                    <td>{item.ordered}</td>
-                                    <td>{item.picked}</td>
-                                    <td>{item.packed}</td>
-                                    <td>
-                                      {item.status === 'done' ? (
-                                        <Check size={14} color="#16a34a" />
-                                      ) : (
-                                        <span className="text-muted">{item.status}</span>
-                                      )}
-                                    </td>
-                                  </tr>
-                                ))}
-                                {order.items.length === 0 && detailLoadingId !== order.id && (
-                                  <tr>
-                                    <td colSpan={6} className="text-muted">
-                                      No line items returned for this order.
-                                    </td>
-                                  </tr>
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
+                          <OrderItemsPanel
+                            orderNumber={order.order_number}
+                            items={order.items}
+                            loading={detailLoadingId === order.id}
+                          />
 
                           <div className="detail-card detail-card-shipping">
                             <h5>Shipping Info</h5>
