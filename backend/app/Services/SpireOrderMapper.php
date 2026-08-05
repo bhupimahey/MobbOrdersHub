@@ -30,8 +30,9 @@ class SpireOrderMapper
 
         $orderNo = (string) ($raw['orderNo'] ?? $raw['id'] ?? '');
         $id = (string) ($raw['id'] ?? $orderNo);
-        $created = $this->formatDate($raw['orderDate'] ?? $raw['created'] ?? null);
-        $modified = $this->formatDate($raw['modified'] ?? $raw['created'] ?? null);
+        // Prefer orderDate for the day; attach time from created when Spire sends date-only orderDate.
+        $created = $this->formatOrderDateTime($raw['orderDate'] ?? null, $raw['created'] ?? null);
+        $modified = $this->formatDateTime($raw['modified'] ?? $raw['created'] ?? null);
         $customer = (string) data_get($raw, 'customer.name', data_get($raw, 'shippingAddress.name', '—'));
 
         $conditions = [];
@@ -92,6 +93,7 @@ class SpireOrderMapper
             ],
             'spire' => [
                 'status' => $raw['status'] ?? null,
+                'phase_id' => $raw['phaseId'] ?? null,
                 'invoice_no' => $raw['invoiceNo'] ?? null,
                 'batch_no' => $raw['batchNo'] ?? null,
             ],
@@ -131,16 +133,10 @@ class SpireOrderMapper
 
     private function resolvePhase(array $raw): string
     {
-        // Prefer explicit Spire phaseId if it matches our codes / numbers
-        $phaseId = strtolower(trim((string) ($raw['phaseId'] ?? '')));
-        if (in_array($phaseId, self::PHASES, true)) {
-            return $phaseId;
-        }
-        if (is_numeric($phaseId)) {
-            $idx = ((int) $phaseId) - 1;
-            if (isset(self::PHASES[$idx])) {
-                return self::PHASES[$idx];
-            }
+        // Spire custom workflow uses phaseId labels like "PICKED & PACKED"
+        $fromPhaseId = $this->mapSpirePhaseId((string) ($raw['phaseId'] ?? ''));
+        if ($fromPhaseId !== null) {
+            return $fromPhaseId;
         }
 
         $status = strtolower(trim((string) ($raw['status'] ?? '')));
@@ -151,7 +147,9 @@ class SpireOrderMapper
         if (str_contains($status, 'complete') || str_contains($status, 'closed') || $status === 'c') {
             return 'completed';
         }
-        if ($shipDate !== '' || $tracking !== '' || str_contains($status, 'ship')) {
+        // Only treat as shipped when Spire has an actual ship date (tracking alone is not enough —
+        // clients often enter a test tracking # before the shipped phase).
+        if ($shipDate !== '' || (str_contains($status, 'ship') && ! str_contains($status, 'prep'))) {
             return 'shipped';
         }
         if ($invoiceNo !== '' || str_contains($status, 'invoice') || $status === 'i') {
@@ -164,8 +162,66 @@ class SpireOrderMapper
             return 'shipping_preparation';
         }
 
-        // Open / default
+        // Open order with tracking pre-filled still stays in received unless phaseId says otherwise
+        if ($tracking !== '' && $status === 'o') {
+            return 'received';
+        }
+
         return 'received';
+    }
+
+    private function mapSpirePhaseId(string $phaseId): ?string
+    {
+        $raw = trim($phaseId);
+        if ($raw === '') {
+            return null;
+        }
+
+        $normalized = strtolower($raw);
+        $normalized = str_replace(['&', '/', '-', '_'], ' ', $normalized);
+        $normalized = (string) preg_replace('/\s+/', ' ', $normalized);
+
+        if (in_array($normalized, self::PHASES, true)) {
+            return $normalized;
+        }
+
+        if (is_numeric($normalized)) {
+            $idx = ((int) $normalized) - 1;
+
+            return self::PHASES[$idx] ?? null;
+        }
+
+        $aliases = [
+            'received' => 'received',
+            'order received' => 'received',
+            'ready to pick' => 'ready_to_pick',
+            'ready for pick' => 'ready_to_pick',
+            'picked packed' => 'picked_packed',
+            'picked and packed' => 'picked_packed',
+            'pick packed' => 'picked_packed',
+            'shipping preparation' => 'shipping_preparation',
+            'shipping prep' => 'shipping_preparation',
+            'ship preparation' => 'shipping_preparation',
+            'invoiced' => 'invoiced',
+            'invoice' => 'invoiced',
+            'shipped' => 'shipped',
+            'ship' => 'shipped',
+            'completed' => 'completed',
+            'complete' => 'completed',
+            'closed' => 'completed',
+        ];
+
+        if (isset($aliases[$normalized])) {
+            return $aliases[$normalized];
+        }
+
+        foreach ($aliases as $needle => $code) {
+            if (str_contains($normalized, $needle)) {
+                return $code;
+            }
+        }
+
+        return null;
     }
 
     private function phaseStates(int $currentIndex): array
@@ -235,10 +291,41 @@ class SpireOrderMapper
 
     private function formatDate(mixed $value): string
     {
+        return $this->formatDateTime($value);
+    }
+
+    /**
+     * Spire orderDate is often date-only (YYYY-MM-DD). Prefer created timestamp for clock time.
+     */
+    private function formatOrderDateTime(mixed $orderDate, mixed $created): string
+    {
+        $orderDate = $orderDate !== null && $orderDate !== '' ? (string) $orderDate : '';
+        $created = $created !== null && $created !== '' ? (string) $created : '';
+
+        if ($orderDate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $orderDate) && $created !== '') {
+            try {
+                $createdDt = new \DateTimeImmutable($created);
+
+                return $orderDate.' '.$createdDt->format('H:i');
+            } catch (\Throwable) {
+                return $orderDate;
+            }
+        }
+
+        if ($orderDate !== '') {
+            return $this->formatDateTime($orderDate);
+        }
+
+        return $this->formatDateTime($created);
+    }
+
+    private function formatDateTime(mixed $value): string
+    {
         if (! $value) {
             return '';
         }
         try {
+            // Spire timestamps are usually office-local without timezone suffix.
             return (new \DateTimeImmutable((string) $value))->format('Y-m-d H:i');
         } catch (\Throwable) {
             return (string) $value;
