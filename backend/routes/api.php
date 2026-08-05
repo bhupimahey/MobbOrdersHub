@@ -25,6 +25,7 @@ Route::middleware(['auth:sanctum', EnsureUserIsActive::class])->group(function (
 
     Route::get('/dashboard', [OrderController::class, 'dashboard']);
     Route::get('/orders', [OrderController::class, 'index']);
+    Route::get('/orders/{orderId}/raw', [OrderController::class, 'raw']);
     Route::get('/orders/{orderId}', [OrderController::class, 'show']);
     Route::get('/orders/{orderId}/status', [OrderController::class, 'status']);
     Route::post('/orders/{orderId}', [OrderController::class, 'update']);

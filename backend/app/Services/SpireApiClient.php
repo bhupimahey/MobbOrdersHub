@@ -505,20 +505,37 @@ class SpireApiClient
         $cacheKey = 'spire:order:'.$this->cacheGen().':'.$this->company().':'.$orderId;
 
         return Cache::remember($cacheKey, 60, function () use ($orderId) {
-            $response = $this->get($this->companyPath('sales/orders/'.$orderId));
-
-            if (! $response->successful()) {
-                Log::warning('Spire get sales order failed', [
-                    'order_id' => $orderId,
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                ]);
-
-                return null;
-            }
-
-            return $response->json();
+            return $this->fetchSalesOrder($orderId);
         });
+    }
+
+    /** Fresh Spire order JSON (no cache) for admin Order JSON viewer. */
+    public function getSalesOrderFresh(string|int $orderId): ?array
+    {
+        $raw = $this->fetchSalesOrder($orderId);
+        if ($raw) {
+            $cacheKey = 'spire:order:'.$this->cacheGen().':'.$this->company().':'.$orderId;
+            Cache::put($cacheKey, $raw, 60);
+        }
+
+        return $raw;
+    }
+
+    private function fetchSalesOrder(string|int $orderId): ?array
+    {
+        $response = $this->get($this->companyPath('sales/orders/'.$orderId));
+
+        if (! $response->successful()) {
+            Log::warning('Spire get sales order failed', [
+                'order_id' => $orderId,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+
+            return null;
+        }
+
+        return $response->json();
     }
 
     /**

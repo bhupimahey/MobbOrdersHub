@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import api from '../api/client'
 import WorkflowStepper from '../components/WorkflowStepper'
-import OrdersTable from '../components/OrdersTable'
+import OrdersTable, { todayISO } from '../components/OrdersTable'
 import PageLoader from '../components/PageLoader'
 import RightRail from '../components/RightRail'
 import DateRangeFilter from '../components/DateRangeFilter'
@@ -33,12 +33,13 @@ function readDashboardCache(): DashboardData | null {
 }
 
 export default function DashboardPage() {
+  const today = todayISO()
   const cached = readDashboardCache()
   const [data, setData] = useState<DashboardData | null>(cached)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+  const [dateFrom, setDateFrom] = useState(today)
+  const [dateTo, setDateTo] = useState(today)
   const [loading, setLoading] = useState(!cached)
 
   useEffect(() => {
@@ -93,13 +94,20 @@ export default function DashboardPage() {
     delayed_orders: 0,
   }
 
+  const rangeLabel =
+    dateFrom && dateTo && dateFrom === dateTo
+      ? `Today (${dateFrom})`
+      : dateFrom || dateTo
+        ? 'Selected date range'
+        : 'All dates'
+
   return (
     <div className="dashboard">
       <div className="page-header">
         <div>
           <h1>Orders Dashboard</h1>
           <p>
-            Latest 10 orders overview
+            Latest 10 orders · {rangeLabel}
             {data?.using_mock ? ' · Mock data' : ''}
             {loading && data ? ' · Refreshing…' : ''}
           </p>

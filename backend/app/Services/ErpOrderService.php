@@ -19,8 +19,15 @@ class ErpOrderService
     {
         if ($this->useMock()) {
             $orders = $this->mockOrders();
+            $filtered = $this->filterForUser($orders, $user, $filters);
+            $limit = max(1, min(200, (int) ($filters['limit'] ?? 50)));
+            $page = max(1, (int) ($filters['page'] ?? 1));
+            $filtered['meta'] = array_merge($filtered['meta'] ?? [], [
+                'page' => $page,
+                'per_page' => $limit,
+            ]);
 
-            return $this->filterForUser($orders, $user, $filters);
+            return $filtered;
         }
 
         if (! $this->spire->configured()) {
@@ -34,9 +41,13 @@ class ErpOrderService
             ];
         }
 
+        $limit = max(1, min(200, (int) ($filters['limit'] ?? 50)));
+        $page = max(1, (int) ($filters['page'] ?? 1));
+        $start = ($page - 1) * $limit;
+
         $query = [
-            'start' => 0,
-            'limit' => (int) ($filters['limit'] ?? 100),
+            'start' => $start,
+            'limit' => $limit,
         ];
 
         if (! empty($filters['search'])) {
@@ -50,6 +61,8 @@ class ErpOrderService
                 'data' => [],
                 'meta' => [
                     'count' => 0,
+                    'page' => $page,
+                    'per_page' => $limit,
                     'using_mock' => false,
                     'error' => $result['error'],
                 ],
@@ -57,8 +70,62 @@ class ErpOrderService
         }
 
         $orders = $this->mapper->mapList($result['records'] ?? []);
+        $filtered = $this->filterForUser($orders, $user, $filters);
+        $spireCount = $result['count'] ?? null;
 
-        return $this->filterForUser($orders, $user, $filters);
+        $filtered['meta'] = array_merge($filtered['meta'] ?? [], [
+            'page' => $page,
+            'per_page' => $limit,
+            'spire_count' => $spireCount,
+            'start' => $start,
+        ]);
+
+        return $filtered;
+    }
+
+    /**
+     * Full raw Spire sales-order JSON (for admin cross-check).
+     */
+    public function getRawOrder(string $orderId): ?array
+    {
+        if ($this->useMock()) {
+            $mapped = collect($this->mockOrders())->firstWhere('id', $orderId)
+                ?? collect($this->mockOrders())->firstWhere('order_number', $orderId);
+
+            return $mapped ? [
+                'source' => 'mock',
+                'order' => $mapped,
+            ] : null;
+        }
+
+        if (! $this->spire->configured()) {
+            return null;
+        }
+
+        $raw = $this->spire->getSalesOrderFresh($orderId);
+        if (! $raw) {
+            $list = $this->spire->listSalesOrders(['q' => $orderId, 'limit' => 5]);
+            $match = collect($list['records'] ?? [])->first(function ($row) use ($orderId) {
+                return (string) ($row['id'] ?? '') === $orderId
+                    || (string) ($row['orderNo'] ?? '') === $orderId;
+            });
+            if (is_array($match) && ! empty($match['id'])) {
+                $raw = $this->spire->getSalesOrderFresh((string) $match['id']) ?? $match;
+            } else {
+                $raw = is_array($match) ? $match : null;
+            }
+        }
+
+        if (! is_array($raw)) {
+            return null;
+        }
+
+        return [
+            'source' => 'spire',
+            'order_id' => $raw['id'] ?? $orderId,
+            'order_no' => $raw['orderNo'] ?? null,
+            'order' => $raw,
+        ];
     }
 
     public function getOrder(string $orderId): ?array
@@ -154,7 +221,7 @@ class ErpOrderService
 
     public function dashboardSummary(?User $user = null): array
     {
-        $result = $this->listOrders($user);
+        $result = $this->listOrders($user, ['limit' => 100, 'page' => 1]);
         $orders = $result['data'] ?? [];
 
         $total = count($orders);
@@ -169,9 +236,10 @@ class ErpOrderService
             'customer_pickup' => collect($orders)->filter(fn ($o) => in_array('Customer Pickup', $o['conditions'] ?? [], true))->count(),
         ];
 
+        // Return a larger pool so the dashboard can filter by today's date client-side.
         $latestOrders = collect($orders)
             ->sortByDesc(fn ($o) => $o['order_date'] ?? $o['last_updated'] ?? '')
-            ->take(10)
+            ->take(100)
             ->values()
             ->all();
 

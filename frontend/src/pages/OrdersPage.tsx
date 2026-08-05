@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { RefreshCw, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, RefreshCw, Search } from 'lucide-react'
 import api from '../api/client'
 import DateRangeFilter from '../components/DateRangeFilter'
 import OrdersTable from '../components/OrdersTable'
@@ -9,6 +9,7 @@ import type { Order } from '../types'
 import { PHASES_META } from '../types'
 
 const CACHE_KEY = 'orders'
+const PAGE_SIZE = 50
 
 function orderDay(value: string): string {
   return value.slice(0, 10)
@@ -21,6 +22,7 @@ export default function OrdersPage() {
   const [status, setStatus] = useState('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(!cached)
   const [usingMock, setUsingMock] = useState(cached?.usingMock ?? false)
   const [error, setError] = useState('')
@@ -32,7 +34,8 @@ export default function OrdersPage() {
       if (!cached) setLoading(true)
       setError('')
       try {
-        const { data } = await api.get('/orders', { params: { limit: 50 } })
+        // Pull a larger pool; UI paginates at 50 after local filters.
+        const { data } = await api.get('/orders', { params: { limit: 200, page: 1 } })
         if (cancelled) return
         const list = data.data ?? []
         setAllOrders(list)
@@ -58,7 +61,7 @@ export default function OrdersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reloadKey])
 
-  const orders = useMemo(() => {
+  const filtered = useMemo(() => {
     let list = allOrders
     if (status !== 'all') {
       list = list.filter((o) => o.current_phase === status)
@@ -75,6 +78,21 @@ export default function OrdersPage() {
     if (dateTo) list = list.filter((o) => orderDay(o.order_date) <= dateTo)
     return list
   }, [allOrders, search, status, dateFrom, dateTo])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+
+  useEffect(() => {
+    setPage(1)
+  }, [search, status, dateFrom, dateTo])
+
+  const pageOrders = useMemo(() => {
+    const start = (safePage - 1) * PAGE_SIZE
+    return filtered.slice(start, start + PAGE_SIZE)
+  }, [filtered, safePage])
+
+  const fromIdx = filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1
+  const toIdx = Math.min(safePage * PAGE_SIZE, filtered.length)
 
   return (
     <div className="listing-page">
@@ -132,15 +150,51 @@ export default function OrdersPage() {
       )}
 
       <div className="orders-full">
-        {loading && orders.length === 0 ? (
+        {loading && ordersEmpty(allOrders) ? (
           <PageLoader label="Loading orders" />
         ) : (
-          <OrdersTable
-            key={`${reloadKey}-${status}-${dateFrom}-${dateTo}-${orders[0]?.id ?? 'none'}`}
-            orders={orders}
-          />
+          <>
+            <OrdersTable
+              key={`${reloadKey}-${status}-${dateFrom}-${dateTo}-${safePage}-${pageOrders[0]?.id ?? 'none'}`}
+              orders={pageOrders}
+            />
+            <div className="pagination-bar">
+              <div className="pagination-info">
+                Showing {fromIdx}–{toIdx} of {filtered.length}
+                {' · '}
+                {PAGE_SIZE} per page
+              </div>
+              <div className="pagination-controls">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  disabled={safePage <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  <ChevronLeft size={14} />
+                  Prev
+                </button>
+                <span className="pagination-page">
+                  Page {safePage} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  disabled={safePage >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Next
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </div>
     </div>
   )
+}
+
+function ordersEmpty(orders: Order[]) {
+  return orders.length === 0
 }

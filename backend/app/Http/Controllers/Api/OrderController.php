@@ -13,7 +13,7 @@ class OrderController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $filters = $request->only(['search', 'status', 'date_from', 'date_to']);
+        $filters = $request->only(['search', 'status', 'date_from', 'date_to', 'limit', 'page']);
 
         return response()->json(
             $this->orders->listOrders($request->user(), $filters)
@@ -29,6 +29,17 @@ class OrderController extends Controller
         }
 
         return response()->json(['data' => $order]);
+    }
+
+    public function raw(string $orderId): JsonResponse
+    {
+        $raw = $this->orders->getRawOrder($orderId);
+
+        if (! $raw) {
+            return response()->json(['message' => 'Order not found in Spire.'], 404);
+        }
+
+        return response()->json(['data' => $raw]);
     }
 
     public function status(string $orderId): JsonResponse
