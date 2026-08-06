@@ -8,18 +8,13 @@ import {
 } from 'lucide-react'
 import api from '../api/client'
 import WorkflowStepper from '../components/WorkflowStepper'
-import OrdersTable, { todayISO } from '../components/OrdersTable'
+import OrdersTable from '../components/OrdersTable'
 import PageLoader from '../components/PageLoader'
 import RightRail from '../components/RightRail'
-import DateRangeFilter from '../components/DateRangeFilter'
 import { DASH_CACHE_KEY } from '../context/AuthContext'
 import { readPageCache, writePageCache } from '../lib/pageCache'
 import type { DashboardData, Order } from '../types'
 import { PHASES_META } from '../types'
-
-function orderDay(value: string): string {
-  return value.slice(0, 10)
-}
 
 function readDashboardCache(): DashboardData | null {
   const fromPage = readPageCache<DashboardData>('dashboard', 90_000)
@@ -33,13 +28,10 @@ function readDashboardCache(): DashboardData | null {
 }
 
 export default function DashboardPage() {
-  const today = todayISO()
   const cached = readDashboardCache()
   const [data, setData] = useState<DashboardData | null>(cached)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
-  const [dateFrom, setDateFrom] = useState(today)
-  const [dateTo, setDateTo] = useState(today)
   const [loading, setLoading] = useState(!cached)
 
   useEffect(() => {
@@ -78,16 +70,10 @@ export default function DashboardPage() {
           o.customer.toLowerCase().includes(q),
       )
     }
-    if (dateFrom) {
-      list = list.filter((o) => orderDay(o.order_date) >= dateFrom)
-    }
-    if (dateTo) {
-      list = list.filter((o) => orderDay(o.order_date) <= dateTo)
-    }
     return [...list].sort((a, b) =>
       (b.order_date || '').localeCompare(a.order_date || ''),
     )
-  }, [data, search, status, dateFrom, dateTo])
+  }, [data, search, status])
 
   const stats = data?.stats ?? {
     total_orders: 0,
@@ -96,22 +82,16 @@ export default function DashboardPage() {
     delayed_orders: 0,
   }
 
-  const rangeLabel =
-    dateFrom && dateTo && dateFrom === dateTo
-      ? `Today (${dateFrom})`
-      : dateFrom || dateTo
-        ? 'Selected date range'
-        : 'All dates'
-
   return (
     <div className="dashboard">
       <div className="page-header">
         <div>
           <h1>Orders Dashboard</h1>
           <p>
-            Open orders (excludes Completed) · {rangeLabel}
+            Open orders (excludes Completed)
             {data?.using_mock ? ' · Mock data' : ''}
             {loading && data ? ' · Refreshing…' : ''}
+            {!loading ? ` · ${orders.length} shown` : ''}
           </p>
         </div>
         <div className="toolbar">
@@ -132,16 +112,6 @@ export default function DashboardPage() {
               </option>
             ))}
           </select>
-          <div className="date-range-filter-wrap">
-            <DateRangeFilter
-              dateFrom={dateFrom}
-              dateTo={dateTo}
-              onChange={(from, to) => {
-                setDateFrom(from)
-                setDateTo(to)
-              }}
-            />
-          </div>
         </div>
       </div>
 
