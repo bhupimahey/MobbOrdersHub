@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, RefreshCw, Search } from 'lucide-react'
+import { RefreshCw, Search } from 'lucide-react'
 import api from '../api/client'
 import DateRangeFilter from '../components/DateRangeFilter'
 import OrdersTable from '../components/OrdersTable'
@@ -9,7 +9,6 @@ import type { Order } from '../types'
 import { PHASES_META } from '../types'
 
 const CACHE_KEY = 'orders'
-const PAGE_SIZE = 50
 
 function orderDay(value: string): string {
   return value.slice(0, 10)
@@ -22,7 +21,6 @@ export default function OrdersPage() {
   const [status, setStatus] = useState('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
-  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(!cached)
   const [usingMock, setUsingMock] = useState(cached?.usingMock ?? false)
   const [error, setError] = useState('')
@@ -34,7 +32,6 @@ export default function OrdersPage() {
       if (!cached) setLoading(true)
       setError('')
       try {
-        // Pull a larger pool; UI paginates at 50 after local filters.
         const { data } = await api.get('/orders', { params: { limit: 200, page: 1 } })
         if (cancelled) return
         const list = data.data ?? []
@@ -81,21 +78,6 @@ export default function OrdersPage() {
     )
   }, [allOrders, search, status, dateFrom, dateTo])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const safePage = Math.min(page, totalPages)
-
-  useEffect(() => {
-    setPage(1)
-  }, [search, status, dateFrom, dateTo])
-
-  const pageOrders = useMemo(() => {
-    const start = (safePage - 1) * PAGE_SIZE
-    return filtered.slice(start, start + PAGE_SIZE)
-  }, [filtered, safePage])
-
-  const fromIdx = filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1
-  const toIdx = Math.min(safePage * PAGE_SIZE, filtered.length)
-
   return (
     <div className="listing-page">
       <div className="page-header">
@@ -105,6 +87,7 @@ export default function OrdersPage() {
             All orders from the ERP API
             {usingMock ? ' · Mock data' : ''}
             {loading && allOrders.length > 0 ? ' · Refreshing…' : ''}
+            {!loading ? ` · ${filtered.length} shown` : ''}
           </p>
         </div>
         <div className="toolbar">
@@ -155,42 +138,10 @@ export default function OrdersPage() {
         {loading && ordersEmpty(allOrders) ? (
           <PageLoader label="Loading orders" />
         ) : (
-          <>
-            <OrdersTable
-              key={`${reloadKey}-${status}-${dateFrom}-${dateTo}-${safePage}-${pageOrders[0]?.id ?? 'none'}`}
-              orders={pageOrders}
-            />
-            <div className="pagination-bar">
-              <div className="pagination-info">
-                Showing {fromIdx}–{toIdx} of {filtered.length}
-                {' · '}
-                {PAGE_SIZE} per page
-              </div>
-              <div className="pagination-controls">
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  disabled={safePage <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  <ChevronLeft size={14} />
-                  Prev
-                </button>
-                <span className="pagination-page">
-                  Page {safePage} / {totalPages}
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  disabled={safePage >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                >
-                  Next
-                  <ChevronRight size={14} />
-                </button>
-              </div>
-            </div>
-          </>
+          <OrdersTable
+            key={`${reloadKey}-${status}-${dateFrom}-${dateTo}-${filtered[0]?.id ?? 'none'}`}
+            orders={filtered}
+          />
         )}
       </div>
     </div>

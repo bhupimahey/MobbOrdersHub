@@ -29,6 +29,7 @@ class SpireOrderMapperTest extends TestCase
                     'description' => 'The Katrina Black XS',
                     'orderQty' => '1',
                     'committedQty' => '1',
+                    'backorderQty' => '0',
                 ],
             ],
         ]);
@@ -40,6 +41,9 @@ class SpireOrderMapperTest extends TestCase
         $this->assertSame('2026-07-10 00:00', $mapped['shipping']['est_delivery']);
         $this->assertCount(1, $mapped['items']);
         $this->assertSame('T9012-BL-XS', $mapped['items'][0]['sku']);
+        $this->assertSame(1.0, $mapped['items'][0]['ship_qty']);
+        $this->assertSame(0.0, $mapped['items'][0]['bo_qty']);
+        $this->assertSame('done', $mapped['items'][0]['status']);
     }
 
     public function test_tracking_alone_does_not_mean_shipped(): void
@@ -98,5 +102,40 @@ class SpireOrderMapperTest extends TestCase
         $this->assertCount(1, $mapped['items']);
         $this->assertSame('Tall The Elinor Black M', $mapped['items'][0]['item']);
         $this->assertSame('ELINOR-BLK-M', $mapped['items'][0]['sku']);
+    }
+
+    public function test_maps_ship_and_backorder_quantities(): void
+    {
+        $mapper = new SpireOrderMapper;
+        $mapped = $mapper->mapOrder([
+            'id' => 3,
+            'orderNo' => 'E-BO',
+            'status' => 'O',
+            'orderDate' => '2026-08-01',
+            'created' => '2026-08-01T10:00:00',
+            'customer' => ['name' => 'Test'],
+            'items' => [
+                [
+                    'partNo' => 'X310/307-PS-L',
+                    'description' => 'Scrub Set Postman Blue L',
+                    'orderQty' => '4',
+                    'committedQty' => '4',
+                    'backorderQty' => '0',
+                ],
+                [
+                    'partNo' => 'X310/307-PS-XL',
+                    'description' => 'Scrub Set Postman Blue XL',
+                    'orderQty' => '2',
+                    'committedQty' => '1',
+                    'backorderQty' => '1',
+                ],
+            ],
+        ]);
+
+        $this->assertCount(2, $mapped['items']);
+        $this->assertSame('done', $mapped['items'][0]['status']);
+        $this->assertSame(4.0, $mapped['items'][0]['ship_qty']);
+        $this->assertSame('backordered', $mapped['items'][1]['status']);
+        $this->assertSame(1.0, $mapped['items'][1]['bo_qty']);
     }
 }

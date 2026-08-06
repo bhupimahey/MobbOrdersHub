@@ -1103,19 +1103,64 @@ table.data tbody tr.expanded {
   padding: 12px 14px;
 }
 
+.detail-card-items-cta {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  min-height: 72px;
+}
+
+.btn-order-items {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(185, 28, 28, 0.28);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+
+.btn-order-items:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(185, 28, 28, 0.34);
+  filter: brightness(1.03);
+}
+
+.btn-order-items:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.items-empty-inline {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
 .order-items-table {
   width: 100%;
   border-collapse: collapse;
-  table-layout: fixed;
-  font-size: 12.5px;
+  table-layout: auto;
+  font-size: 13px;
 }
 
 .order-items-table th,
 .order-items-table td {
-  padding: 7px 8px 7px 0;
-  border-bottom: 1px solid #f1f5f9;
+  padding: 10px 10px 10px 0;
+  border-bottom: 1px solid #eef2f7;
   vertical-align: middle;
-  /* Nested inside table.data td — override parent nowrap/ellipsis */
   overflow: visible;
   text-overflow: clip;
   white-space: normal;
@@ -1123,23 +1168,32 @@ table.data tbody tr.expanded {
 
 .order-items-table th {
   text-align: left;
-  color: var(--muted);
-  font-weight: 600;
-  font-size: 10.5px;
+  color: #64748b;
+  font-weight: 700;
+  font-size: 11px;
   text-transform: uppercase;
+  letter-spacing: 0.04em;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
 
+.order-items-table .col-sku {
+  width: 18%;
+  white-space: nowrap;
+  font-weight: 600;
+  color: #0f172a;
+}
+
 .order-items-table .col-item {
-  width: 70%;
+  width: auto;
+  min-width: 180px;
   word-break: break-word;
   overflow-wrap: anywhere;
   white-space: normal;
 }
 
 .order-items-table .col-qty {
-  width: 10%;
+  width: 72px;
   text-align: center;
   white-space: nowrap;
 }
@@ -1147,48 +1201,43 @@ table.data tbody tr.expanded {
 .order-items-table th.col-qty,
 .order-items-table td.col-qty {
   text-align: center;
-  padding-right: 4px;
+  padding-right: 8px;
   white-space: nowrap;
 }
 
-.items-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 88px;
-  padding: 12px 8px;
-  color: var(--muted);
-  font-size: 12.5px;
+.order-items-table .col-status {
+  width: 64px;
   text-align: center;
 }
 
-.items-empty p {
-  margin: 0;
+.order-items-table th.col-status,
+.order-items-table td.col-status {
+  text-align: center;
+  padding-right: 0;
 }
 
-.btn-load-more-items {
-  margin-top: 10px;
-  width: 100%;
-  border: 1px dashed var(--border);
-  background: #f8fafc;
-  color: var(--ink);
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+.item-line-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
 }
 
-.btn-load-more-items:hover {
-  background: #fff;
-  border-color: #cbd5e1;
+.item-line-done {
+  color: #fff;
+  background: #16a34a;
+}
+
+.item-line-backorder {
+  color: #fff;
+  background: #dc2626;
+  border-radius: 7px;
 }
 
 .modal-items {
-  width: min(960px, 100%);
+  width: min(920px, 100%);
   max-height: min(90vh, 820px);
   display: flex;
   flex-direction: column;
@@ -1200,23 +1249,7 @@ table.data tbody tr.expanded {
 }
 
 .modal-items .order-items-table {
-  table-layout: auto;
-  font-size: 13px;
-}
-
-.modal-items .order-items-table .col-item {
-  width: auto;
-  min-width: 0;
-  white-space: normal;
-  word-break: break-word;
-  overflow-wrap: anywhere;
-  overflow: visible;
-  text-overflow: clip;
-}
-
-.modal-items .order-items-table .col-qty {
-  width: 1%;
-  white-space: nowrap;
+  font-size: 13.5px;
 }
 
 .detail-card-shipping,

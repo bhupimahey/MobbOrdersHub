@@ -28,8 +28,8 @@ export interface OrderItem {
   item: string
   sku: string
   ordered: number
-  picked: number
-  packed: number
+  ship_qty: number
+  bo_qty: number
   status: string
 }
 

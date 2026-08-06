@@ -124,8 +124,10 @@ class SpireOrderMapper
             $partNo = trim((string) ($item['partNo'] ?? data_get($item, 'inventory.partNo', '')));
             $description = trim((string) ($item['description'] ?? data_get($item, 'inventory.description', '')));
             $ordered = (float) ($item['orderQty'] ?? $item['qtyOrdered'] ?? $item['quantity'] ?? 0);
-            $picked = (float) ($item['qtyShipped'] ?? $item['shipQty'] ?? $item['picked'] ?? 0);
-            $packed = (float) ($item['qtyPacked'] ?? $item['packed'] ?? $picked);
+            $shipQty = (float) ($item['committedQty'] ?? $item['qtyShipped'] ?? $item['shipQty'] ?? $item['ship_qty'] ?? 0);
+            $boQty = array_key_exists('backorderQty', $item)
+                ? (float) $item['backorderQty']
+                : (array_key_exists('bo_qty', $item) ? (float) $item['bo_qty'] : max(0, $ordered - $shipQty));
 
             // Real inventory lines have a part number. Comment-only rows do not.
             if ($partNo === '') {
@@ -133,14 +135,20 @@ class SpireOrderMapper
             }
 
             $label = $description !== '' ? $description : $partNo;
+            $status = 'in_progress';
+            if ($boQty > 0) {
+                $status = 'backordered';
+            } elseif ($ordered > 0 && $shipQty >= $ordered) {
+                $status = 'done';
+            }
 
             $out[] = [
                 'item' => $label,
                 'sku' => $partNo,
                 'ordered' => $ordered,
-                'picked' => $picked,
-                'packed' => $packed,
-                'status' => ($ordered > 0 && $picked >= $ordered) ? 'done' : 'in_progress',
+                'ship_qty' => $shipQty,
+                'bo_qty' => $boQty,
+                'status' => $status,
             ];
         }
 

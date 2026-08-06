@@ -245,10 +245,10 @@ class ErpOrderService
             'customer_pickup' => collect($orders)->filter(fn ($o) => in_array('Customer Pickup', $o['conditions'] ?? [], true))->count(),
         ];
 
-        // Return a larger pool so the dashboard can filter by today's date client-side.
+        // Open orders only for the dashboard (hide Completed).
         $latestOrders = collect($orders)
+            ->filter(fn ($o) => ($o['current_phase'] ?? '') !== 'completed' && empty($o['is_completed']))
             ->sortByDesc(fn ($o) => $o['order_date'] ?? $o['last_updated'] ?? '')
-            ->take(100)
             ->values()
             ->all();
 
@@ -361,9 +361,9 @@ class ErpOrderService
                 'is_delayed' => false,
                 'completed_today' => false,
                 'items' => [
-                    ['item' => 'Widget A', 'sku' => 'WGT-A-001', 'ordered' => 10, 'picked' => 10, 'packed' => 10, 'status' => 'done'],
-                    ['item' => 'Widget B', 'sku' => 'WGT-B-002', 'ordered' => 5, 'picked' => 5, 'packed' => 5, 'status' => 'done'],
-                    ['item' => 'Bracket C', 'sku' => 'BRK-C-003', 'ordered' => 2, 'picked' => 2, 'packed' => 2, 'status' => 'done'],
+                    ['item' => 'Widget A', 'sku' => 'WGT-A-001', 'ordered' => 10, 'ship_qty' => 10, 'bo_qty' => 0, 'status' => 'done'],
+                    ['item' => 'Widget B', 'sku' => 'WGT-B-002', 'ordered' => 5, 'ship_qty' => 5, 'bo_qty' => 0, 'status' => 'done'],
+                    ['item' => 'Bracket C', 'sku' => 'BRK-C-003', 'ordered' => 2, 'ship_qty' => 2, 'bo_qty' => 0, 'status' => 'done'],
                 ],
                 'shipping' => [
                     'carrier' => 'FedEx',
@@ -402,7 +402,7 @@ class ErpOrderService
                 'is_delayed' => false,
                 'completed_today' => false,
                 'items' => [
-                    ['item' => 'Case Pack', 'sku' => 'CP-100', 'ordered' => 20, 'picked' => 18, 'packed' => 0, 'status' => 'in_progress'],
+                    ['item' => 'Case Pack', 'sku' => 'CP-100', 'ordered' => 20, 'ship_qty' => 18, 'bo_qty' => 2, 'status' => 'backordered'],
                 ],
                 'shipping' => null,
                 'timeline' => [
@@ -434,7 +434,7 @@ class ErpOrderService
                 'is_delayed' => false,
                 'completed_today' => false,
                 'items' => [
-                    ['item' => 'Display Kit', 'sku' => 'DSP-01', 'ordered' => 1, 'picked' => 0, 'packed' => 0, 'status' => 'pending'],
+                    ['item' => 'Display Kit', 'sku' => 'DSP-01', 'ordered' => 1, 'ship_qty' => 0, 'bo_qty' => 1, 'status' => 'backordered'],
                 ],
                 'shipping' => null,
                 'timeline' => [
@@ -465,7 +465,7 @@ class ErpOrderService
                 'is_delayed' => true,
                 'completed_today' => false,
                 'items' => [
-                    ['item' => 'Bolt Set', 'sku' => 'BLT-44', 'ordered' => 50, 'picked' => 50, 'packed' => 50, 'status' => 'done'],
+                    ['item' => 'Bolt Set', 'sku' => 'BLT-44', 'ordered' => 50, 'ship_qty' => 50, 'bo_qty' => 0, 'status' => 'done'],
                 ],
                 'shipping' => [
                     'carrier' => 'UPS',
@@ -506,7 +506,7 @@ class ErpOrderService
                 'is_delayed' => false,
                 'completed_today' => false,
                 'items' => [
-                    ['item' => 'Sensor Pack', 'sku' => 'SNS-9', 'ordered' => 8, 'picked' => 8, 'packed' => 8, 'status' => 'done'],
+                    ['item' => 'Sensor Pack', 'sku' => 'SNS-9', 'ordered' => 8, 'ship_qty' => 8, 'bo_qty' => 0, 'status' => 'done'],
                 ],
                 'shipping' => [
                     'carrier' => 'DHL',
@@ -546,7 +546,7 @@ class ErpOrderService
                 'is_delayed' => false,
                 'completed_today' => true,
                 'items' => [
-                    ['item' => 'Starter Kit', 'sku' => 'STK-1', 'ordered' => 3, 'picked' => 3, 'packed' => 3, 'status' => 'done'],
+                    ['item' => 'Starter Kit', 'sku' => 'STK-1', 'ordered' => 3, 'ship_qty' => 3, 'bo_qty' => 0, 'status' => 'done'],
                 ],
                 'shipping' => [
                     'carrier' => 'FedEx',

@@ -6,6 +6,7 @@ import {
   FileText,
   MoreVertical,
   Package,
+  PackageX,
   Scale,
   ShoppingCart,
   Truck,
@@ -18,26 +19,59 @@ import api from '../api/client'
 import type { Order, OrderItem } from '../types'
 import { PHASES_META, phaseColor, phaseLabel } from '../types'
 
-const ITEMS_PREVIEW_LIMIT = 4
+function formatQty(value: number): string {
+  if (Number.isInteger(value)) return String(value)
+  return String(value)
+}
+
+function ItemLineStatus({ status, boQty }: { status: string; boQty: number }) {
+  const key = status.trim().toLowerCase()
+  const isDone = key === 'done' || key === 'completed' || key === 'complete'
+  const isBackordered = key === 'backordered' || boQty > 0
+
+  if (isDone && !isBackordered) {
+    return (
+      <span className="item-line-status item-line-done" title="Fulfilled" aria-label="Fulfilled">
+        <Check size={14} strokeWidth={2.5} />
+      </span>
+    )
+  }
+
+  return (
+    <span
+      className="item-line-status item-line-backorder"
+      title={isBackordered ? 'Backordered' : 'In progress'}
+      aria-label={isBackordered ? 'Backordered' : 'In progress'}
+    >
+      <PackageX size={14} strokeWidth={2.25} />
+    </span>
+  )
+}
 
 function OrderItemsTable({ items }: { items: OrderItem[] }) {
   return (
     <table className="order-items-table">
       <thead>
         <tr>
+          <th className="col-sku">SKU</th>
           <th className="col-item">Item</th>
           <th className="col-qty">Ord.</th>
-          <th className="col-qty">Picked</th>
-          <th className="col-qty">Packed</th>
+          <th className="col-qty">ShipQty</th>
+          <th className="col-qty">BOQty</th>
+          <th className="col-status">Status</th>
         </tr>
       </thead>
       <tbody>
         {items.map((item, index) => (
           <tr key={`${item.sku}-${item.item}-${index}`}>
+            <td className="col-sku">{item.sku}</td>
             <td className="col-item">{item.item}</td>
-            <td className="col-qty">{item.ordered}</td>
-            <td className="col-qty">{item.picked}</td>
-            <td className="col-qty">{item.packed}</td>
+            <td className="col-qty">{formatQty(item.ordered)}</td>
+            <td className="col-qty">{formatQty(item.ship_qty)}</td>
+            <td className="col-qty">{formatQty(item.bo_qty)}</td>
+            <td className="col-status">
+              <ItemLineStatus status={item.status} boQty={item.bo_qty} />
+            </td>
           </tr>
         ))}
       </tbody>
@@ -64,8 +98,7 @@ function OrderItemsPanel({
 }) {
   const [itemsModalOpen, setItemsModalOpen] = useState(false)
   const visibleItems = items.filter(isRealOrderItem)
-  const preview = visibleItems.slice(0, ITEMS_PREVIEW_LIMIT)
-  const hasMore = visibleItems.length > ITEMS_PREVIEW_LIMIT
+  const canOpen = visibleItems.length > 0
 
   useEffect(() => {
     if (!itemsModalOpen) return
@@ -78,32 +111,27 @@ function OrderItemsPanel({
 
   return (
     <>
-      <div className="detail-card detail-card-items">
-        <h5>Order Items ({visibleItems.length})</h5>
-        {loading && visibleItems.length === 0 ? (
-          <div className="items-empty text-muted">Loading line items…</div>
-        ) : visibleItems.length === 0 ? (
-          <div className="items-empty">
-            <Package size={18} strokeWidth={1.75} />
-            <p>No line items on this order yet.</p>
-          </div>
-        ) : (
-          <>
-            <OrderItemsTable items={preview} />
-            {hasMore ? (
-              <button
-                type="button"
-                className="btn-load-more-items"
-                onClick={() => setItemsModalOpen(true)}
-              >
-                Load more items ({visibleItems.length - ITEMS_PREVIEW_LIMIT} more)
-              </button>
-            ) : null}
-          </>
-        )}
+      <div className="detail-card detail-card-items detail-card-items-cta">
+        <button
+          type="button"
+          className="btn-order-items"
+          onClick={() => setItemsModalOpen(true)}
+          disabled={!canOpen || (loading && !canOpen)}
+        >
+          <Package size={16} strokeWidth={2.25} />
+          <span>
+            Order Items ({loading && !canOpen ? '…' : visibleItems.length})
+          </span>
+        </button>
+        {!loading && !canOpen ? (
+          <p className="items-empty-inline">No line items on this order yet.</p>
+        ) : null}
+        {loading && !canOpen ? (
+          <p className="items-empty-inline text-muted">Loading line items…</p>
+        ) : null}
       </div>
 
-      {itemsModalOpen
+      {itemsModalOpen && canOpen
         ? createPortal(
             <div
               className="modal-backdrop"
@@ -119,11 +147,10 @@ function OrderItemsPanel({
               >
                 <div className="modal-json-header">
                   <div>
-                    <h2 id="order-items-modal-title">Order Items</h2>
-                    <p>
-                      {orderNumber} · {visibleItems.length} line item
-                      {visibleItems.length === 1 ? '' : 's'}
-                    </p>
+                    <h2 id="order-items-modal-title">
+                      Order Items ({visibleItems.length})
+                    </h2>
+                    <p>{orderNumber}</p>
                   </div>
                   <button
                     type="button"

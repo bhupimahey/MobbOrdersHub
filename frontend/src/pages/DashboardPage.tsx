@@ -65,6 +65,8 @@ export default function DashboardPage() {
 
   const orders = useMemo(() => {
     let list: Order[] = data?.orders ?? []
+    // Dashboard shows open workflow only — hide Completed orders.
+    list = list.filter((o) => o.current_phase !== 'completed' && !o.is_completed)
     if (status !== 'all') {
       list = list.filter((o) => o.current_phase === status)
     }
@@ -82,9 +84,9 @@ export default function DashboardPage() {
     if (dateTo) {
       list = list.filter((o) => orderDay(o.order_date) <= dateTo)
     }
-    return [...list]
-      .sort((a, b) => (b.order_date || '').localeCompare(a.order_date || ''))
-      .slice(0, 10)
+    return [...list].sort((a, b) =>
+      (b.order_date || '').localeCompare(a.order_date || ''),
+    )
   }, [data, search, status, dateFrom, dateTo])
 
   const stats = data?.stats ?? {
@@ -107,7 +109,7 @@ export default function DashboardPage() {
         <div>
           <h1>Orders Dashboard</h1>
           <p>
-            Latest 10 orders · {rangeLabel}
+            Open orders (excludes Completed) · {rangeLabel}
             {data?.using_mock ? ' · Mock data' : ''}
             {loading && data ? ' · Refreshing…' : ''}
           </p>
@@ -124,7 +126,7 @@ export default function DashboardPage() {
           </div>
           <select className="select" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="all">All Status</option>
-            {PHASES_META.map((p) => (
+            {PHASES_META.filter((p) => p.code !== 'completed').map((p) => (
               <option key={p.code} value={p.code}>
                 {p.name}
               </option>
