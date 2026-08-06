@@ -1195,7 +1195,7 @@ table.data tbody tr.expanded {
 }
 
 .order-items-table .col-qty {
-  width: 72px;
+  width: 96px;
   text-align: center;
   white-space: nowrap;
 }
@@ -1208,7 +1208,7 @@ table.data tbody tr.expanded {
 }
 
 .order-items-table .col-status {
-  width: 64px;
+  width: 72px;
   text-align: center;
 }
 
@@ -1219,23 +1219,44 @@ table.data tbody tr.expanded {
 }
 
 .item-line-status {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 999px;
+  width: 28px;
+  height: 28px;
 }
 
 .item-line-done {
   color: #fff;
   background: #16a34a;
+  border-radius: 999px;
 }
 
 .item-line-backorder {
-  color: #fff;
+  color: #dc2626;
+  background: transparent;
+}
+
+.item-line-backorder-box {
+  display: block;
+}
+
+.item-line-backorder-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
   background: #dc2626;
-  border-radius: 7px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 14px;
+  text-align: center;
+  border: 1.5px solid #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.2);
 }
 
 .modal-items {

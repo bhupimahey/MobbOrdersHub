@@ -6,7 +6,6 @@ import {
   FileText,
   MoreVertical,
   Package,
-  PackageX,
   Scale,
   ShoppingCart,
   Truck,
@@ -32,7 +31,7 @@ function ItemLineStatus({ status, boQty }: { status: string; boQty: number }) {
   if (isDone && !isBackordered) {
     return (
       <span className="item-line-status item-line-done" title="Fulfilled" aria-label="Fulfilled">
-        <Check size={14} strokeWidth={2.5} />
+        <Check size={15} strokeWidth={2.75} />
       </span>
     )
   }
@@ -43,7 +42,10 @@ function ItemLineStatus({ status, boQty }: { status: string; boQty: number }) {
       title={isBackordered ? 'Backordered' : 'In progress'}
       aria-label={isBackordered ? 'Backordered' : 'In progress'}
     >
-      <PackageX size={14} strokeWidth={2.25} />
+      <Package size={16} strokeWidth={2.25} className="item-line-backorder-box" />
+      <span className="item-line-backorder-badge" aria-hidden="true">
+        !
+      </span>
     </span>
   )
 }
@@ -55,9 +57,9 @@ function OrderItemsTable({ items }: { items: OrderItem[] }) {
         <tr>
           <th className="col-sku">SKU</th>
           <th className="col-item">Item</th>
-          <th className="col-qty">Ord.</th>
-          <th className="col-qty">ShipQty</th>
-          <th className="col-qty">BOQty</th>
+          <th className="col-qty">Order Qty</th>
+          <th className="col-qty">Commited Qty</th>
+          <th className="col-qty">Bckorder Qty</th>
           <th className="col-status">Status</th>
         </tr>
       </thead>
