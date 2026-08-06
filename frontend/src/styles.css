@@ -1260,8 +1260,8 @@ table.data tbody tr.expanded {
 }
 
 .modal-items {
-  width: min(920px, 100%);
-  max-height: min(90vh, 820px);
+  width: min(1180px, calc(100vw - 48px));
+  max-height: min(90vh, 860px);
   display: flex;
   flex-direction: column;
 }
@@ -1273,6 +1273,21 @@ table.data tbody tr.expanded {
 
 .modal-items .order-items-table {
   font-size: 13.5px;
+  min-width: 100%;
+}
+
+.modal-items .order-items-table .col-item {
+  min-width: 280px;
+}
+
+.modal-items .order-items-table .col-qty {
+  width: 110px;
+  min-width: 100px;
+}
+
+.modal-items .order-items-table .col-status {
+  width: 80px;
+  min-width: 72px;
 }
 
 .detail-card-shipping,
@@ -2939,6 +2954,9 @@ table.data td:nth-child(9) {
     margin: 12px;
     max-height: calc(100vh - 24px);
     overflow-y: auto;
+  }
+  .modal.modal-items {
+    width: min(1180px, calc(100vw - 24px));
   }
   .login-page {
     grid-template-columns: 1fr;
