@@ -1082,7 +1082,8 @@ table.data tbody tr.expanded {
 
 .detail-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.85fr) minmax(150px, 0.72fr) minmax(145px, 0.68fr) minmax(160px, 0.85fr);
+  /* Compact Order Items CTA; give Shipping / Timeline / Additional more room */
+  grid-template-columns: minmax(140px, 0.5fr) minmax(0, 1.15fr) minmax(0, 1.05fr) minmax(0, 1.2fr);
   gap: 10px;
   padding-top: 8px;
   width: 100%;
@@ -1109,20 +1110,21 @@ table.data tbody tr.expanded {
   justify-content: center;
   gap: 8px;
   min-height: 72px;
+  padding: 10px;
 }
 
 .btn-order-items {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
   border: none;
   border-radius: 10px;
-  padding: 12px 14px;
+  padding: 10px 8px;
   background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
   color: #fff;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.01em;
   cursor: pointer;
