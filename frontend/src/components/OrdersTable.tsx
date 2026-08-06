@@ -298,7 +298,7 @@ export { todayISO }
 
 export default function OrdersTable({ orders }: { orders: Order[] }) {
   const [rows, setRows] = useState<Order[]>(orders)
-  const [expanded, setExpanded] = useState<string | null>(orders[0]?.id ?? null)
+  const [expanded, setExpanded] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [jsonOrder, setJsonOrder] = useState<Order | null>(null)
