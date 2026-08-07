@@ -50,9 +50,17 @@ function ItemLineStatus({ status, boQty }: { status: string; boQty: number }) {
   )
 }
 
-function OrderItemsTable({ items }: { items: OrderItem[] }) {
+const ITEMS_PREVIEW_LIMIT = 4
+
+function OrderItemsTable({
+  items,
+  compact = false,
+}: {
+  items: OrderItem[]
+  compact?: boolean
+}) {
   return (
-    <table className="order-items-table">
+    <table className={`order-items-table${compact ? ' order-items-table-compact' : ''}`}>
       <thead>
         <tr>
           <th className="col-sku">SKU</th>
@@ -66,12 +74,12 @@ function OrderItemsTable({ items }: { items: OrderItem[] }) {
       <tbody>
         {items.map((item, index) => (
           <tr key={`${item.sku}-${item.item}-${index}`}>
-            <td className="col-sku">{item.sku}</td>
-            <td className="col-item">{item.item}</td>
-            <td className="col-qty">{formatQty(item.ordered)}</td>
-            <td className="col-qty">{formatQty(item.ship_qty)}</td>
-            <td className="col-qty">{formatQty(item.bo_qty)}</td>
-            <td className="col-status">
+            <td className="col-sku" data-label="SKU">{item.sku}</td>
+            <td className="col-item" data-label="Item">{item.item}</td>
+            <td className="col-qty" data-label="Order Qty">{formatQty(item.ordered)}</td>
+            <td className="col-qty" data-label="Commited Qty">{formatQty(item.ship_qty)}</td>
+            <td className="col-qty" data-label="Bckorder Qty">{formatQty(item.bo_qty)}</td>
+            <td className="col-status" data-label="Status">
               <ItemLineStatus status={item.status} boQty={item.bo_qty} />
             </td>
           </tr>
@@ -100,7 +108,8 @@ function OrderItemsPanel({
 }) {
   const [itemsModalOpen, setItemsModalOpen] = useState(false)
   const visibleItems = items.filter(isRealOrderItem)
-  const canOpen = visibleItems.length > 0
+  const preview = visibleItems.slice(0, ITEMS_PREVIEW_LIMIT)
+  const hasMore = visibleItems.length > ITEMS_PREVIEW_LIMIT
 
   useEffect(() => {
     if (!itemsModalOpen) return
@@ -113,27 +122,34 @@ function OrderItemsPanel({
 
   return (
     <>
-      <div className="detail-card detail-card-items detail-card-items-cta">
-        <button
-          type="button"
-          className="btn-order-items"
-          onClick={() => setItemsModalOpen(true)}
-          disabled={!canOpen || (loading && !canOpen)}
-        >
-          <Package size={16} strokeWidth={2.25} />
-          <span>
-            Order Items ({loading && !canOpen ? '…' : visibleItems.length})
-          </span>
-        </button>
-        {!loading && !canOpen ? (
-          <p className="items-empty-inline">No line items on this order yet.</p>
-        ) : null}
-        {loading && !canOpen ? (
-          <p className="items-empty-inline text-muted">Loading line items…</p>
-        ) : null}
+      <div className="detail-card detail-card-items">
+        <div className="items-panel-head">
+          <h5>Order Items ({loading && visibleItems.length === 0 ? '…' : visibleItems.length})</h5>
+        </div>
+        {loading && visibleItems.length === 0 ? (
+          <div className="items-empty text-muted">Loading line items…</div>
+        ) : visibleItems.length === 0 ? (
+          <div className="items-empty">
+            <Package size={18} strokeWidth={1.75} />
+            <p>No line items on this order yet.</p>
+          </div>
+        ) : (
+          <>
+            <OrderItemsTable items={preview} compact />
+            {hasMore ? (
+              <button
+                type="button"
+                className="btn-view-all-items"
+                onClick={() => setItemsModalOpen(true)}
+              >
+                View all {visibleItems.length} items
+              </button>
+            ) : null}
+          </>
+        )}
       </div>
 
-      {itemsModalOpen && canOpen
+      {itemsModalOpen && visibleItems.length > 0
         ? createPortal(
             <div
               className="modal-backdrop"
