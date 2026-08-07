@@ -417,9 +417,107 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
     }
   }
 
+  const renderActions = (order: Order, menuOpen: boolean) => (
+    <div
+      className="row-actions"
+      ref={menuOpen ? menuRef : undefined}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        className="btn btn-icon btn-ghost actions-btn"
+        onClick={() => setMenuFor(menuOpen ? null : order.id)}
+        aria-label="More actions"
+        aria-expanded={menuOpen}
+      >
+        <MoreVertical size={18} />
+      </button>
+      {menuOpen && (
+        <div className="row-actions-menu">
+          <button type="button" onClick={() => void openOrderJson(order)}>
+            <FileCode2 size={14} />
+            Order JSON
+          </button>
+        </div>
+      )}
+    </div>
+  )
+
+  const renderDetails = (order: Order) => (
+    <div className="detail-grid">
+      <OrderItemsPanel
+        orderNumber={order.order_number}
+        items={order.items}
+        loading={detailLoadingId === order.id}
+      />
+
+      <div className="detail-card detail-card-shipping">
+        <h5>Shipping Info</h5>
+        {order.shipping ? (
+          <div className="kv kv-stack">
+            <div><span>Carrier</span><strong>{order.shipping.carrier}</strong></div>
+            <div><span>Service</span><strong>{order.shipping.service}</strong></div>
+            <div>
+              <span>Tracking #</span>
+              <strong className="tracking-row">
+                {order.shipping.tracking}
+                <button
+                  type="button"
+                  className="btn btn-icon btn-ghost"
+                  style={{ height: 18, width: 18 }}
+                  onClick={() => void copyTracking(order.shipping!.tracking)}
+                  aria-label="Copy tracking"
+                >
+                  {copied ? <Check size={10} /> : <Copy size={10} />}
+                </button>
+              </strong>
+            </div>
+            <div><span>Weight</span><strong>{order.shipping.weight}</strong></div>
+            <div><span>Est. Delivery</span><strong>{order.shipping.est_delivery}</strong></div>
+          </div>
+        ) : (
+          <div className="text-muted" style={{ fontSize: 11 }}>
+            No shipping details yet.
+          </div>
+        )}
+      </div>
+
+      <div className="detail-card detail-card-timeline">
+        <h5>Order Timeline</h5>
+        <div className="timeline timeline-compact">
+          {order.timeline.map((t, i) => (
+            <div
+              className={`timeline-item ${
+                i === order.timeline.length - 1 ? 'current' : 'done'
+              }`}
+              key={`${t.phase}-${t.at}`}
+            >
+              <i />
+              <div className="timeline-text">
+                <strong>{t.phase}</strong>
+                <div className="when">{t.at}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="detail-card detail-card-additional">
+        <h5>Additional Info</h5>
+        <div className="kv kv-stack">
+          <div><span>Sales Order #</span><strong>{order.additional.sales_order}</strong></div>
+          <div><span>Customer PO #</span><strong>{order.additional.customer_po}</strong></div>
+          <div><span>Created By</span><strong>{order.additional.created_by}</strong></div>
+          <div><span>Warehouse</span><strong>{order.additional.warehouse}</strong></div>
+          <div><span>Notes</span><strong>{order.additional.notes || '—'}</strong></div>
+        </div>
+      </div>
+    </div>
+  )
+
   return (
     <div className="panel">
-      <div className="table-wrap">
+      <div className="table-wrap orders-desktop">
         <table className="data">
           <thead>
             <tr>
@@ -465,108 +563,11 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
                       ))}
                     </td>
                     <td>{formatUpdated(order.last_updated)}</td>
-                    <td className="actions-cell">
-                      <div
-                        className="row-actions"
-                        ref={menuOpen ? menuRef : undefined}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          type="button"
-                          className="btn btn-icon btn-ghost actions-btn"
-                          onClick={() => setMenuFor(menuOpen ? null : order.id)}
-                          aria-label="More actions"
-                          aria-expanded={menuOpen}
-                        >
-                          <MoreVertical size={18} />
-                        </button>
-                        {menuOpen && (
-                          <div className="row-actions-menu">
-                            <button
-                              type="button"
-                              onClick={() => void openOrderJson(order)}
-                            >
-                              <FileCode2 size={14} />
-                              Order JSON
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </td>
+                    <td className="actions-cell">{renderActions(order, menuOpen)}</td>
                   </tr>
                   {open && (
                     <tr className="expanded-row">
-                      <td colSpan={9}>
-                        <div className="detail-grid">
-                          <OrderItemsPanel
-                            orderNumber={order.order_number}
-                            items={order.items}
-                            loading={detailLoadingId === order.id}
-                          />
-
-                          <div className="detail-card detail-card-shipping">
-                            <h5>Shipping Info</h5>
-                            {order.shipping ? (
-                              <div className="kv kv-stack">
-                                <div><span>Carrier</span><strong>{order.shipping.carrier}</strong></div>
-                                <div><span>Service</span><strong>{order.shipping.service}</strong></div>
-                                <div>
-                                  <span>Tracking #</span>
-                                  <strong className="tracking-row">
-                                    {order.shipping.tracking}
-                                    <button
-                                      type="button"
-                                      className="btn btn-icon btn-ghost"
-                                      style={{ height: 18, width: 18 }}
-                                      onClick={() => void copyTracking(order.shipping!.tracking)}
-                                      aria-label="Copy tracking"
-                                    >
-                                      {copied ? <Check size={10} /> : <Copy size={10} />}
-                                    </button>
-                                  </strong>
-                                </div>
-                                <div><span>Weight</span><strong>{order.shipping.weight}</strong></div>
-                                <div><span>Est. Delivery</span><strong>{order.shipping.est_delivery}</strong></div>
-                              </div>
-                            ) : (
-                              <div className="text-muted" style={{ fontSize: 11 }}>
-                                No shipping details yet.
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="detail-card detail-card-timeline">
-                            <h5>Order Timeline</h5>
-                            <div className="timeline timeline-compact">
-                              {order.timeline.map((t, i) => (
-                                <div
-                                  className={`timeline-item ${
-                                    i === order.timeline.length - 1 ? 'current' : 'done'
-                                  }`}
-                                  key={`${t.phase}-${t.at}`}
-                                >
-                                  <i />
-                                  <div className="timeline-text">
-                                    <strong>{t.phase}</strong>
-                                    <div className="when">{t.at}</div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="detail-card detail-card-additional">
-                            <h5>Additional Info</h5>
-                            <div className="kv kv-stack">
-                              <div><span>Sales Order #</span><strong>{order.additional.sales_order}</strong></div>
-                              <div><span>Customer PO #</span><strong>{order.additional.customer_po}</strong></div>
-                              <div><span>Created By</span><strong>{order.additional.created_by}</strong></div>
-                              <div><span>Warehouse</span><strong>{order.additional.warehouse}</strong></div>
-                              <div><span>Notes</span><strong>{order.additional.notes || '—'}</strong></div>
-                            </div>
-                          </div>
-                        </div>
-                      </td>
+                      <td colSpan={9}>{renderDetails(order)}</td>
                     </tr>
                   )}
                 </Fragment>
@@ -581,6 +582,48 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="orders-mobile">
+        {rows.length === 0 ? (
+          <div className="empty">No orders found for your assigned phases.</div>
+        ) : (
+          rows.map((order) => {
+            const open = expanded === order.id
+            const menuOpen = menuFor === order.id
+            return (
+              <article
+                key={`m-${order.id}`}
+                className={`order-card ${open ? 'is-open' : ''}`}
+              >
+                <button
+                  type="button"
+                  className="order-card-main"
+                  onClick={() => toggleExpand(order)}
+                >
+                  <div className="order-card-top">
+                    <span className="order-link">{order.order_number}</span>
+                    <PhaseBadge code={order.current_phase} />
+                  </div>
+                  <div className="order-card-customer">{order.customer}</div>
+                  <div className="order-card-meta">
+                    <span className="order-card-date">{order.order_date}</span>
+                    {formatElapsed(order.elapsed_time)}
+                  </div>
+                  {order.conditions.length > 0 ? (
+                    <div className="order-card-conditions">
+                      {order.conditions.map((c) => (
+                        <ConditionBadge key={c} label={c} />
+                      ))}
+                    </div>
+                  ) : null}
+                </button>
+                <div className="order-card-actions">{renderActions(order, menuOpen)}</div>
+                {open ? <div className="order-card-details">{renderDetails(order)}</div> : null}
+              </article>
+            )
+          })
+        )}
       </div>
 
       {jsonOrder && (

@@ -335,6 +335,10 @@ h4 {
   margin-bottom: 0;
 }
 
+.orders-mobile {
+  display: none;
+}
+
 .page-header {
   display: flex;
   justify-content: space-between;
@@ -3015,6 +3019,9 @@ table.data td:nth-child(9) {
   .main {
     grid-column: 1;
     padding: 12px 12px 20px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
   .nav-list {
     flex-direction: row;
@@ -3055,107 +3062,128 @@ table.data td:nth-child(9) {
   .right-rail {
     grid-template-columns: 1fr;
   }
+
+  .workflow-panel {
+    overflow-x: auto;
+  }
   .workflow {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    row-gap: 18px;
+    grid-template-columns: repeat(4, minmax(72px, 1fr));
+    gap: 12px 8px;
+    padding: 14px 8px 10px;
+    min-width: 0;
   }
   .workflow-track-line,
   .workflow-arrow {
     display: none;
   }
+  .workflow-step h4 {
+    font-size: 11px;
+  }
+  .step-badge {
+    width: 40px;
+    height: 40px;
+  }
+  .legend {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 12px;
+    padding: 0 12px 12px;
+  }
 
-  /* Mobile order rows: card layout instead of wide table */
-  .orders-full .table-wrap {
-    overflow: visible;
+  /* Desktop table off; dedicated mobile cards on */
+  .orders-desktop {
+    display: none !important;
   }
-  .orders-full table.data {
-    min-width: 0;
-    table-layout: auto;
-  }
-  .orders-full table.data thead {
-    display: none;
-  }
-  .orders-full table.data tbody {
+  .orders-mobile {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    padding: 10px;
   }
-  .orders-full table.data tbody tr.clickable {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 4px 10px;
-    padding: 12px;
+  .orders-full .panel {
+    overflow: visible;
+  }
+
+  .order-card {
+    position: relative;
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 14px;
     background: #fff;
     box-shadow: var(--shadow-xs);
+    overflow: hidden;
   }
-  .orders-full table.data tbody tr.clickable td {
-    border: none;
-    padding: 0;
-    white-space: normal;
-    overflow: visible;
-    text-overflow: unset;
+  .order-card.is-open {
+    box-shadow: var(--shadow-sm);
   }
-  .orders-full table.data tbody tr.clickable td:nth-child(1) {
-    grid-column: 1;
-    grid-row: 1;
-  }
-  .orders-full table.data tbody tr.clickable td:nth-child(2) {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    font-weight: 600;
-    color: #0f172a;
-  }
-  .orders-full table.data tbody tr.clickable td:nth-child(3) {
-    grid-column: 1;
-    grid-row: 3;
-    font-size: 12px;
-  }
-  .orders-full table.data tbody tr.clickable td:nth-child(4) {
-    display: none;
-  }
-  .orders-full table.data tbody tr.clickable td:nth-child(5) {
-    grid-column: 2;
-    grid-row: 1;
-    justify-self: end;
-  }
-  .orders-full table.data tbody tr.clickable td:nth-child(6) {
-    grid-column: 2;
-    grid-row: 3;
-    justify-self: end;
-  }
-  .orders-full table.data tbody tr.clickable td:nth-child(7) {
-    grid-column: 1 / -1;
-    grid-row: 4;
-  }
-  .orders-full table.data tbody tr.clickable td:nth-child(8) {
-    display: none;
-  }
-  .orders-full table.data tbody tr.clickable td:nth-child(9) {
-    grid-column: 2;
-    grid-row: 4;
-    justify-self: end;
-  }
-  .orders-full table.data tbody tr.expanded-row {
-    display: block;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: #f8fafc;
-    padding: 10px;
-    margin-top: -4px;
-  }
-  .orders-full table.data tbody tr.expanded-row > td {
-    display: block;
+  .order-card-main {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
     width: 100%;
     border: none;
-    padding: 0;
-    overflow: visible;
-    white-space: normal;
+    background: transparent;
+    text-align: left;
+    padding: 14px 48px 14px 14px;
+    cursor: pointer;
   }
+  .order-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .order-card-top .order-link {
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .order-card-top .badge {
+    flex-shrink: 0;
+  }
+  .order-card-customer {
+    font-size: 14px;
+    font-weight: 650;
+    color: #0f172a;
+    line-height: 1.35;
+    word-break: break-word;
+  }
+  .order-card-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .order-card-date,
+  .order-card-meta .elapsed-hot,
+  .order-card-meta .text-muted {
+    font-size: 12.5px;
+    white-space: nowrap;
+  }
+  .order-card-conditions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .order-card-actions {
+    position: absolute;
+    top: 10px;
+    right: 8px;
+  }
+  .order-card-details {
+    border-top: 1px solid var(--border);
+    background: #f8fafc;
+    padding: 10px;
+  }
+
   .detail-grid {
     grid-template-columns: 1fr;
   }
+  .detail-card-items {
+    overflow-x: auto;
+  }
+
   .modal {
     width: min(520px, calc(100vw - 24px));
     margin: 12px;
@@ -3201,13 +3229,21 @@ table.data td:nth-child(9) {
     flex-direction: column;
     align-items: stretch;
   }
+  .page-header h1 {
+    font-size: 22px;
+  }
   .toolbar {
     flex-direction: column;
     align-items: stretch;
   }
   .toolbar .select,
-  .toolbar .btn {
+  .toolbar .btn,
+  .search-wrap {
     width: 100%;
+    max-width: none;
+  }
+  .workflow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .listing-table th,
   .listing-table td {
@@ -3218,5 +3254,8 @@ table.data td:nth-child(9) {
   }
   .order-items-table td {
     grid-template-columns: 96px minmax(0, 1fr);
+  }
+  .order-card-main {
+    padding-right: 44px;
   }
 }
