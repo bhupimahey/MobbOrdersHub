@@ -1264,6 +1264,83 @@ table.data tbody tr.expanded {
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.2);
 }
 
+.items-view-table {
+  display: block;
+}
+
+.items-view-cards {
+  display: none;
+}
+
+.order-items-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.order-item-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px 14px;
+}
+
+.order-item-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.order-item-sku {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #0f172a;
+  word-break: break-all;
+}
+
+.order-item-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #334155;
+  line-height: 1.35;
+  margin-bottom: 10px;
+  word-break: break-word;
+}
+
+.order-item-qtys {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  border-top: 1px solid #eef2f7;
+  padding-top: 10px;
+}
+
+.order-item-qtys > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.order-item-qtys span {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.order-item-qtys strong {
+  font-size: 15px;
+  font-weight: 750;
+  color: #0f172a;
+}
+
 /* Higher specificity so base .modal { width: 640px } does not shrink this dialog */
 .modal.modal-items {
   width: min(1280px, calc(100vw - 32px));
@@ -1273,6 +1350,13 @@ table.data tbody tr.expanded {
   flex-direction: column;
   overflow: hidden;
   padding: 22px 24px;
+  margin: 0 auto;
+}
+
+.modal-backdrop-items {
+  padding: 12px;
+  align-items: center;
+  justify-items: center;
 }
 
 .modal-items-body {
@@ -1320,77 +1404,53 @@ table.data tbody tr.expanded {
   min-width: 0;
 }
 
-/* Stack item rows as cards on narrow screens (preview + modal) */
 @media (max-width: 720px) {
-  .order-items-table,
-  .order-items-table tbody,
-  .order-items-table tr,
-  .order-items-table td {
-    display: block;
-    width: 100%;
-  }
-
-  .order-items-table thead {
+  .items-view-table {
     display: none;
   }
 
-  .order-items-table {
-    table-layout: auto;
+  .items-view-cards {
+    display: block;
   }
 
-  .order-items-table tr {
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 10px 12px;
-    margin-bottom: 8px;
-    background: #fff;
-  }
-
-  .order-items-table th,
-  .order-items-table td {
-    border-bottom: none;
-    padding: 4px 0;
-  }
-
-  .order-items-table td {
-    display: grid;
-    grid-template-columns: 110px minmax(0, 1fr);
-    gap: 8px;
-    align-items: start;
-    white-space: normal;
-  }
-
-  .order-items-table td::before {
-    content: attr(data-label);
-    color: var(--muted);
-    font-size: 10.5px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    padding-top: 2px;
-  }
-
-  .order-items-table .col-sku,
-  .order-items-table .col-item,
-  .order-items-table .col-qty,
-  .order-items-table .col-status {
-    width: auto;
-    min-width: 0;
-    text-align: left;
-  }
-
-  .order-items-table .col-status {
-    align-items: center;
+  .modal-backdrop-items {
+    padding: 8px;
+    place-items: stretch center;
   }
 
   .modal.modal-items {
-    width: calc(100vw - 16px);
-    max-width: calc(100vw - 16px);
-    padding: 16px;
+    width: 100%;
+    max-width: 100%;
+    height: min(92vh, 100%);
+    max-height: 92vh;
+    margin: 0;
+    border-radius: 16px;
+    padding: 14px 14px 16px;
   }
 
-  .modal.modal-items .order-items-table {
-    table-layout: auto;
+  .modal.modal-items .modal-json-header {
+    margin-bottom: 10px;
+    align-items: center;
+  }
+
+  .modal.modal-items .modal-json-header h2 {
+    font-size: 18px;
+  }
+
+  .order-item-card {
+    padding: 12px;
+  }
+
+  .order-item-qtys {
+    gap: 6px;
+  }
+
+  .order-item-qtys span {
+    font-size: 9.5px;
+  }
+
+  .order-item-qtys strong {
+    font-size: 14px;
   }
 }
 
@@ -3191,8 +3251,9 @@ table.data td:nth-child(9) {
     overflow-y: auto;
   }
   .modal.modal-items {
-    width: calc(100vw - 16px);
-    max-width: calc(100vw - 16px);
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
     overflow: hidden;
   }
   .login-page {
@@ -3252,10 +3313,10 @@ table.data td:nth-child(9) {
   .condition-item .desc {
     display: none;
   }
-  .order-items-table td {
-    grid-template-columns: 96px minmax(0, 1fr);
-  }
   .order-card-main {
     padding-right: 44px;
+  }
+  .order-item-qtys {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

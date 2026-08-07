@@ -74,18 +74,67 @@ function OrderItemsTable({
       <tbody>
         {items.map((item, index) => (
           <tr key={`${item.sku}-${item.item}-${index}`}>
-            <td className="col-sku" data-label="SKU">{item.sku}</td>
-            <td className="col-item" data-label="Item">{item.item}</td>
-            <td className="col-qty" data-label="Order Qty">{formatQty(item.ordered)}</td>
-            <td className="col-qty" data-label="Commited Qty">{formatQty(item.ship_qty)}</td>
-            <td className="col-qty" data-label="Bckorder Qty">{formatQty(item.bo_qty)}</td>
-            <td className="col-status" data-label="Status">
+            <td className="col-sku">{item.sku}</td>
+            <td className="col-item">{item.item}</td>
+            <td className="col-qty">{formatQty(item.ordered)}</td>
+            <td className="col-qty">{formatQty(item.ship_qty)}</td>
+            <td className="col-qty">{formatQty(item.bo_qty)}</td>
+            <td className="col-status">
               <ItemLineStatus status={item.status} boQty={item.bo_qty} />
             </td>
           </tr>
         ))}
       </tbody>
     </table>
+  )
+}
+
+function OrderItemsCards({ items }: { items: OrderItem[] }) {
+  return (
+    <ul className="order-items-cards">
+      {items.map((item, index) => (
+        <li key={`${item.sku}-${item.item}-${index}`} className="order-item-card">
+          <div className="order-item-card-top">
+            <span className="order-item-sku">{item.sku}</span>
+            <ItemLineStatus status={item.status} boQty={item.bo_qty} />
+          </div>
+          <div className="order-item-name">{item.item}</div>
+          <div className="order-item-qtys">
+            <div>
+              <span>Order Qty</span>
+              <strong>{formatQty(item.ordered)}</strong>
+            </div>
+            <div>
+              <span>Commited Qty</span>
+              <strong>{formatQty(item.ship_qty)}</strong>
+            </div>
+            <div>
+              <span>Bckorder Qty</span>
+              <strong>{formatQty(item.bo_qty)}</strong>
+            </div>
+          </div>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function OrderItemsViews({
+  items,
+  compact = false,
+}: {
+  items: OrderItem[]
+  compact?: boolean
+}) {
+  return (
+    <>
+      <div className="items-view-table">
+        <OrderItemsTable items={items} compact={compact} />
+      </div>
+      <div className="items-view-cards">
+        <OrderItemsCards items={items} />
+      </div>
+    </>
   )
 }
 
@@ -135,7 +184,7 @@ function OrderItemsPanel({
           </div>
         ) : (
           <>
-            <OrderItemsTable items={preview} compact />
+            <OrderItemsViews items={preview} compact />
             {hasMore ? (
               <button
                 type="button"
@@ -152,7 +201,7 @@ function OrderItemsPanel({
       {itemsModalOpen && visibleItems.length > 0
         ? createPortal(
             <div
-              className="modal-backdrop"
+              className="modal-backdrop modal-backdrop-items"
               onClick={() => setItemsModalOpen(false)}
               role="presentation"
             >
@@ -180,7 +229,7 @@ function OrderItemsPanel({
                   </button>
                 </div>
                 <div className="modal-items-body">
-                  <OrderItemsTable items={visibleItems} />
+                  <OrderItemsViews items={visibleItems} />
                 </div>
               </div>
             </div>,
