@@ -558,6 +558,10 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
           <div><span>Customer PO #</span><strong>{order.additional.customer_po}</strong></div>
           <div><span>Created By</span><strong>{order.additional.created_by}</strong></div>
           <div><span>Warehouse</span><strong>{order.additional.warehouse}</strong></div>
+          <div><span>Terms</span><strong>{order.additional.terms || order.financial?.terms_text || '—'}</strong></div>
+          <div><span>Discount %</span><strong>{order.financial?.discount ?? '—'}</strong></div>
+          <div><span>Freight</span><strong>{order.financial?.freight ?? '—'}</strong></div>
+          <div><span>Total</span><strong>{order.financial?.total ?? '—'}</strong></div>
           <div><span>Notes</span><strong>{order.additional.notes || '—'}</strong></div>
         </div>
       </div>

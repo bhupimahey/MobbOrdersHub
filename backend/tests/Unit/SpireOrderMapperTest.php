@@ -46,6 +46,47 @@ class SpireOrderMapperTest extends TestCase
         $this->assertSame('done', $mapped['items'][0]['status']);
     }
 
+    public function test_maps_financial_fields(): void
+    {
+        $mapper = new SpireOrderMapper;
+        $mapped = $mapper->mapOrder([
+            'id' => 271519,
+            'orderNo' => '00167864-0',
+            'status' => 'O',
+            'orderDate' => '2026-08-04',
+            'created' => '2026-08-04T19:03:19.906029',
+            'freight' => '0',
+            'discount' => '3',
+            'totalDiscount' => '57.83',
+            'surcharge' => '0',
+            'subtotal' => '1927.7',
+            'total' => '2112.95',
+            'totalOrdered' => '2112.95',
+            'subtotalOrdered' => '1927.7',
+            'grossProfit' => '1869.87',
+            'grossProfitMargin' => '100',
+            'weight' => '0',
+            'termsCode' => 'NET60',
+            'termsText' => 'Net 60 Days',
+            'backordered' => false,
+            'totalBackorderQty' => '0',
+            'requiredDate' => '2026-08-04',
+            'customer' => ['name' => 'Canadian Linen'],
+            'shippingAddress' => [
+                'shipCode' => 'UPS',
+                'shipDescription' => 'UPS',
+            ],
+        ]);
+
+        $this->assertSame('0', $mapped['financial']['freight']);
+        $this->assertSame('3', $mapped['financial']['discount']);
+        $this->assertSame('57.83', $mapped['financial']['total_discount']);
+        $this->assertSame('1927.7', $mapped['financial']['subtotal']);
+        $this->assertSame('2112.95', $mapped['financial']['total']);
+        $this->assertSame('Net 60 Days', $mapped['financial']['terms_text']);
+        $this->assertSame('UPS', $mapped['shipping']['service']);
+    }
+
     public function test_tracking_alone_does_not_mean_shipped(): void
     {
         $mapper = new SpireOrderMapper;

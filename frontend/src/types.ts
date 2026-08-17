@@ -56,6 +56,25 @@ export interface Order {
     weight: string
     est_delivery: string
   } | null
+  financial?: {
+    freight: string
+    discount: string
+    total_discount: string
+    surcharge: string
+    subtotal: string
+    subtotal_ordered: string
+    total: string
+    total_ordered: string
+    gross_profit: string
+    gross_profit_margin: string
+    weight: string
+    currency: string
+    terms_code: string
+    terms_text: string
+    backordered: boolean
+    total_backorder_qty: string
+    required_date: string | null
+  }
   timeline: { phase: string; at: string }[]
   additional: {
     sales_order: string
@@ -63,6 +82,8 @@ export interface Order {
     created_by: string
     warehouse: string
     notes: string
+    terms?: string
+    salesperson?: string
   }
 }
 

@@ -53,13 +53,14 @@ class SpireOrderMapper
         $tracking = trim((string) ($raw['trackingNo'] ?? ''));
         $carrier = trim((string) ($raw['shippingCarrier'] ?? ''));
         $weight = trim((string) ($raw['weight'] ?? ''));
+        $service = trim((string) data_get($raw, 'shippingAddress.shipDescription', $shipCode !== '' ? $shipCode : ''));
         $shipDate = $this->formatDateTime($raw['shipDate'] ?? $raw['requiredDate'] ?? null);
 
         $shipping = null;
-        if ($carrier !== '' || $tracking !== '' || $weight !== '') {
+        if ($carrier !== '' || $tracking !== '' || $weight !== '' || $service !== '') {
             $shipping = [
                 'carrier' => $carrier !== '' ? $carrier : '—',
-                'service' => (string) data_get($raw, 'shippingAddress.shipDescription', $shipCode !== '' ? $shipCode : '—'),
+                'service' => $service !== '' ? $service : '—',
                 'tracking' => $tracking !== '' ? $tracking : '—',
                 'weight' => $weight !== '' ? $weight : '—',
                 'est_delivery' => $shipDate ?: '—',
@@ -83,13 +84,16 @@ class SpireOrderMapper
             'completed_today' => $phase === 'completed' && str_starts_with($modified, date('Y-m-d')),
             'items' => $mappedItems,
             'shipping' => $shipping,
+            'financial' => $this->mapFinancial($raw),
             'timeline' => $this->timeline($raw, $phase),
             'additional' => [
                 'sales_order' => $orderNo,
-                'customer_po' => (string) ($raw['customerPO'] ?? '—'),
+                'customer_po' => (string) ($raw['customerPO'] ?? '—') ?: '—',
                 'created_by' => (string) ($raw['createdBy'] ?? '—'),
-                'warehouse' => (string) ($raw['location'] ?? '—'),
-                'notes' => (string) ($raw['referenceNo'] ?? ''),
+                'warehouse' => (string) ($raw['location'] ?? '—') ?: '—',
+                'notes' => (string) ($raw['referenceNo'] ?? '') ?: '—',
+                'terms' => (string) ($raw['termsText'] ?? $raw['termsCode'] ?? '—') ?: '—',
+                'salesperson' => (string) ($raw['salespersonNo'] ?? data_get($raw, 'address.salesperson.code', '—')) ?: '—',
             ],
             'spire' => [
                 'status' => $raw['status'] ?? null,
@@ -98,6 +102,52 @@ class SpireOrderMapper
                 'batch_no' => $raw['batchNo'] ?? null,
             ],
         ];
+    }
+
+    /**
+     * Commercial totals from Spire sales order payload.
+     *
+     * @return array<string, mixed>
+     */
+    private function mapFinancial(array $raw): array
+    {
+        return [
+            'freight' => $this->money($raw['freight'] ?? 0),
+            'discount' => $this->money($raw['discount'] ?? 0),
+            'total_discount' => $this->money($raw['totalDiscount'] ?? 0),
+            'surcharge' => $this->money($raw['surcharge'] ?? 0),
+            'subtotal' => $this->money($raw['subtotal'] ?? 0),
+            'subtotal_ordered' => $this->money($raw['subtotalOrdered'] ?? $raw['subtotal'] ?? 0),
+            'total' => $this->money($raw['total'] ?? 0),
+            'total_ordered' => $this->money($raw['totalOrdered'] ?? $raw['total'] ?? 0),
+            'gross_profit' => $this->money($raw['grossProfit'] ?? 0),
+            'gross_profit_margin' => $this->money($raw['grossProfitMargin'] ?? 0),
+            'weight' => trim((string) ($raw['weight'] ?? '')) !== '' ? (string) $raw['weight'] : '0',
+            'currency' => trim((string) (is_array($raw['currency'] ?? null) ? ($raw['currency']['code'] ?? '') : ($raw['currency'] ?? ''))) ?: 'CAD',
+            'terms_code' => (string) ($raw['termsCode'] ?? ''),
+            'terms_text' => (string) ($raw['termsText'] ?? ''),
+            'backordered' => (bool) ($raw['backordered'] ?? false),
+            'total_backorder_qty' => $this->money($raw['totalBackorderQty'] ?? 0),
+            'required_date' => $this->formatDateTime($raw['requiredDate'] ?? null) ?: null,
+        ];
+    }
+
+    private function money(mixed $value): string
+    {
+        if ($value === null || $value === '') {
+            return '0';
+        }
+
+        if (is_numeric($value)) {
+            $number = (float) $value;
+            if (floor($number) == $number) {
+                return (string) (int) $number;
+            }
+
+            return rtrim(rtrim(number_format($number, 4, '.', ''), '0'), '.') ?: '0';
+        }
+
+        return (string) $value;
     }
 
     private function mapItems(mixed $items): array
