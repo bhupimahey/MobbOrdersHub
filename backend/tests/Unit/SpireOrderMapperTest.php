@@ -104,6 +104,67 @@ class SpireOrderMapperTest extends TestCase
         $this->assertSame('received', $mapped['current_phase']);
     }
 
+    public function test_freight_moves_to_shipping_preparation(): void
+    {
+        $mapper = new SpireOrderMapper;
+        $mapped = $mapper->mapOrder([
+            'id' => 10,
+            'orderNo' => 'F-1',
+            'status' => 'O',
+            'phaseId' => 'PICKED & PACKED',
+            'freight' => '25.50',
+            'orderDate' => '2026-07-10',
+            'created' => '2026-07-10T12:10:31',
+            'customer' => ['name' => 'Test'],
+        ]);
+
+        $this->assertSame('shipping_preparation', $mapped['current_phase']);
+        $this->assertFalse($mapped['is_completed']);
+    }
+
+    public function test_invoice_marks_invoiced_and_completed(): void
+    {
+        $mapper = new SpireOrderMapper;
+        $mapped = $mapper->mapOrder([
+            'id' => 11,
+            'orderNo' => 'I-1',
+            'status' => 'O',
+            'phaseId' => 'INVOICED',
+            'invoiceNo' => 'INV-100',
+            'orderDate' => '2026-07-10',
+            'created' => '2026-07-10T12:10:31',
+            'modified' => date('Y-m-d').'T10:00:00',
+            'customer' => ['name' => 'Test'],
+        ]);
+
+        $this->assertSame('invoiced', $mapped['current_phase']);
+        $this->assertTrue($mapped['is_completed']);
+        $this->assertSame(
+            ['completed', 'completed', 'completed', 'completed', 'completed', 'completed'],
+            $mapped['phase_states']
+        );
+        $phases = array_column($mapped['timeline'], 'phase');
+        $this->assertContains('Invoiced', $phases);
+        $this->assertContains('Completed', $phases);
+    }
+
+    public function test_ship_date_maps_to_shipping_preparation_not_shipped(): void
+    {
+        $mapper = new SpireOrderMapper;
+        $mapped = $mapper->mapOrder([
+            'id' => 12,
+            'orderNo' => 'S-1',
+            'status' => 'O',
+            'shipDate' => '2026-07-11',
+            'orderDate' => '2026-07-10',
+            'created' => '2026-07-10T12:10:31',
+            'customer' => ['name' => 'Test'],
+        ]);
+
+        $this->assertSame('shipping_preparation', $mapped['current_phase']);
+        $this->assertCount(6, $mapped['phase_states']);
+    }
+
     public function test_skips_blank_and_comment_item_rows(): void
     {
         $mapper = new SpireOrderMapper;

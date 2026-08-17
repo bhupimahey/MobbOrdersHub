@@ -59,7 +59,13 @@ export default function OrdersPage() {
   }, [reloadKey])
 
   const filtered = useMemo(() => {
-    let list = allOrders
+    // Open workflow only — hide invoiced/completed orders from the listing.
+    let list = allOrders.filter(
+      (o) =>
+        o.current_phase !== 'completed' &&
+        o.current_phase !== 'invoiced' &&
+        !o.is_completed,
+    )
     if (status !== 'all') {
       list = list.filter((o) => o.current_phase === status)
     }
@@ -84,7 +90,7 @@ export default function OrdersPage() {
         <div>
           <h1>Orders</h1>
           <p>
-            All orders from the ERP API
+            All orders from the ERP API (excludes Completed / Invoiced)
             {usingMock ? ' · Mock data' : ''}
             {loading && allOrders.length > 0 ? ' · Refreshing…' : ''}
             {!loading ? ` · ${filtered.length} shown` : ''}
@@ -102,7 +108,7 @@ export default function OrdersPage() {
           </div>
           <select className="select" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="all">All Status</option>
-            {PHASES_META.map((p) => (
+            {PHASES_META.filter((p) => p.code !== 'completed' && p.code !== 'invoiced').map((p) => (
               <option key={p.code} value={p.code}>
                 {p.name}
               </option>

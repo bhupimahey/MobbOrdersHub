@@ -39,6 +39,34 @@ export default function RightRail({
     <aside className="right-rail">
       <div className="rail-panel">
         <div className="head">
+          <h3>Today&apos;s Summary</h3>
+        </div>
+        <div className="summary-list">
+          <div>
+            <span className="label"><ClipboardList size={14} color="#2563eb" /> Orders Received</span>
+            <strong>{today.orders_received}</strong>
+          </div>
+          <div>
+            <span className="label"><Clock3 size={14} color="#f59e0b" /> In Progress</span>
+            <strong>{today.orders_in_progress}</strong>
+          </div>
+          <div>
+            <span className="label"><CheckCircle2 size={14} color="#16a34a" /> Completed</span>
+            <strong>{today.orders_completed}</strong>
+          </div>
+          <div>
+            <span className="label"><AlertTriangle size={14} color="#ef4444" /> Delayed</span>
+            <strong style={{ color: '#dc2626' }}>{today.delayed_orders}</strong>
+          </div>
+        </div>
+        <div className="summary-link">
+          <span>View Full Reports</span>
+          <ArrowRight size={14} />
+        </div>
+      </div>
+
+      <div className="rail-panel">
+        <div className="head">
           <h3>Order Conditions</h3>
           <span className="subtle">Any phase</span>
         </div>
@@ -75,34 +103,6 @@ export default function RightRail({
             </div>
             <span className="count">{conditions.customer_pickup}</span>
           </div>
-        </div>
-      </div>
-
-      <div className="rail-panel">
-        <div className="head">
-          <h3>Today&apos;s Summary</h3>
-        </div>
-        <div className="summary-list">
-          <div>
-            <span className="label"><ClipboardList size={14} color="#2563eb" /> Orders Received</span>
-            <strong>{today.orders_received}</strong>
-          </div>
-          <div>
-            <span className="label"><Clock3 size={14} color="#f59e0b" /> In Progress</span>
-            <strong>{today.orders_in_progress}</strong>
-          </div>
-          <div>
-            <span className="label"><CheckCircle2 size={14} color="#16a34a" /> Completed</span>
-            <strong>{today.orders_completed}</strong>
-          </div>
-          <div>
-            <span className="label"><AlertTriangle size={14} color="#ef4444" /> Delayed</span>
-            <strong style={{ color: '#dc2626' }}>{today.delayed_orders}</strong>
-          </div>
-        </div>
-        <div className="summary-link">
-          <span>View Full Reports</span>
-          <ArrowRight size={14} />
         </div>
       </div>
     </aside>

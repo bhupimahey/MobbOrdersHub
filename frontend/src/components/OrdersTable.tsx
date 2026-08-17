@@ -8,7 +8,6 @@ import {
   Package,
   Scale,
   ShoppingCart,
-  Truck,
   UserRound,
   X,
 } from 'lucide-react'
@@ -246,7 +245,6 @@ const PHASE_ICONS: Record<string, typeof Check> = {
   picked_packed: Package,
   shipping_preparation: Scale,
   invoiced: FileText,
-  shipped: Truck,
   completed: Check,
 }
 
@@ -260,7 +258,10 @@ function MiniProgress({
   skipped?: string[]
 }) {
   const activeColor = phaseColor(currentPhase)
-  const allDone = currentPhase === 'completed' || states.every((s) => s === 'completed')
+  const allDone =
+    currentPhase === 'completed' ||
+    currentPhase === 'invoiced' ||
+    states.every((s) => s === 'completed')
 
   return (
     <div className="mini-progress" aria-label="Order progress">

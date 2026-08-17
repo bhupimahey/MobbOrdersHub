@@ -57,8 +57,13 @@ export default function DashboardPage() {
 
   const orders = useMemo(() => {
     let list: Order[] = data?.orders ?? []
-    // Dashboard shows open workflow only — hide Completed orders.
-    list = list.filter((o) => o.current_phase !== 'completed' && !o.is_completed)
+    // Dashboard shows open workflow only — hide Completed / Invoiced orders.
+    list = list.filter(
+      (o) =>
+        o.current_phase !== 'completed' &&
+        o.current_phase !== 'invoiced' &&
+        !o.is_completed,
+    )
     if (status !== 'all') {
       list = list.filter((o) => o.current_phase === status)
     }
@@ -86,7 +91,7 @@ export default function DashboardPage() {
     <div className="dashboard">
       <div className="page-header">
         <div>
-          <h1>Orders Dashboard</h1>
+          <h1>Mobb Medical Orders Dashboard</h1>
           <p>
             Open orders (excludes Completed)
             {data?.using_mock ? ' · Mock data' : ''}
@@ -106,7 +111,7 @@ export default function DashboardPage() {
           </div>
           <select className="select" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="all">All Status</option>
-            {PHASES_META.filter((p) => p.code !== 'completed').map((p) => (
+            {PHASES_META.filter((p) => p.code !== 'completed' && p.code !== 'invoiced').map((p) => (
               <option key={p.code} value={p.code}>
                 {p.name}
               </option>

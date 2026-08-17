@@ -140,8 +140,7 @@ export const PHASES_META = [
   { code: 'picked_packed', name: 'Picked & Packed', description: 'Items picked and packed', color: 'green' },
   { code: 'shipping_preparation', name: 'Shipping Preparation', description: 'Order is weighed and prepared for shipping (label & carrier)', color: 'purple' },
   { code: 'invoiced', name: 'Invoiced', description: 'Invoice has been created for the order', color: 'purple' },
-  { code: 'shipped', name: 'Shipped', description: 'Order picked up by carrier / shipped to customer', color: 'orange' },
-  { code: 'completed', name: 'Completed', description: 'Order is successfully delivered and closed', color: 'green' },
+  { code: 'completed', name: 'Completed', description: 'Order is successfully closed after invoicing', color: 'green' },
 ] as const
 
 export function phaseLabel(code: string): string {

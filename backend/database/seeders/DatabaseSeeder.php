@@ -18,8 +18,7 @@ class DatabaseSeeder extends Seeder
             ['code' => 'picked_packed', 'name' => 'Picked & Packed', 'description' => 'Items picked and packed', 'sort_order' => 3, 'color' => 'green', 'icon' => 'package'],
             ['code' => 'shipping_preparation', 'name' => 'Shipping Preparation', 'description' => 'Order is weighed and prepared for shipping (label & carrier)', 'sort_order' => 4, 'color' => 'purple', 'icon' => 'scale'],
             ['code' => 'invoiced', 'name' => 'Invoiced', 'description' => 'Invoice has been created for the order', 'sort_order' => 5, 'color' => 'orange', 'icon' => 'file-text'],
-            ['code' => 'shipped', 'name' => 'Shipped', 'description' => 'Order picked up by carrier / shipped to customer', 'sort_order' => 6, 'color' => 'blue', 'icon' => 'truck'],
-            ['code' => 'completed', 'name' => 'Completed', 'description' => 'Order is successfully delivered and closed', 'sort_order' => 7, 'color' => 'green', 'icon' => 'check-circle'],
+            ['code' => 'completed', 'name' => 'Completed', 'description' => 'Order is successfully closed after invoicing', 'sort_order' => 6, 'color' => 'green', 'icon' => 'check-circle'],
         ];
 
         foreach ($phases as $phase) {
@@ -28,6 +27,9 @@ class DatabaseSeeder extends Seeder
                 array_merge($phase, ['is_active' => true])
             );
         }
+
+        // Retire the removed Shipped phase if it still exists from older seeds.
+        OrderPhase::query()->where('code', 'shipped')->update(['is_active' => false]);
 
         // Create Super Admin once — never overwrite an existing password on re-seed
         $admin = User::query()->firstOrCreate(

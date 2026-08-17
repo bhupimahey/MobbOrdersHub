@@ -247,7 +247,7 @@ class ErpOrderService
 
         // Open orders only for the dashboard (hide Completed).
         $latestOrders = collect($orders)
-            ->filter(fn ($o) => ($o['current_phase'] ?? '') !== 'completed' && empty($o['is_completed']))
+            ->filter(fn ($o) => ! in_array($o['current_phase'] ?? '', ['completed', 'invoiced'], true) && empty($o['is_completed']))
             ->sortByDesc(fn ($o) => $o['order_date'] ?? $o['last_updated'] ?? '')
             ->values()
             ->all();
@@ -352,7 +352,7 @@ class ErpOrderService
                 'order_date' => '2025-05-14 09:12',
                 'current_phase' => 'shipping_preparation',
                 'current_phase_index' => 4,
-                'phase_states' => ['completed', 'completed', 'completed', 'current', 'pending', 'pending', 'pending'],
+                'phase_states' => ['completed', 'completed', 'completed', 'current', 'pending', 'pending'],
                 'skipped_phases' => [],
                 'elapsed_time' => '18 min',
                 'conditions' => [],
@@ -393,7 +393,7 @@ class ErpOrderService
                 'order_date' => '2025-05-14 08:40',
                 'current_phase' => 'picked_packed',
                 'current_phase_index' => 3,
-                'phase_states' => ['completed', 'completed', 'current', 'pending', 'pending', 'pending', 'pending'],
+                'phase_states' => ['completed', 'completed', 'current', 'pending', 'pending', 'pending'],
                 'skipped_phases' => [],
                 'elapsed_time' => '45 min',
                 'conditions' => ['On Hold'],
@@ -425,7 +425,7 @@ class ErpOrderService
                 'order_date' => '2025-05-14 07:15',
                 'current_phase' => 'ready_to_pick',
                 'current_phase_index' => 2,
-                'phase_states' => ['completed', 'current', 'skipped', 'skipped', 'pending', 'pending', 'pending'],
+                'phase_states' => ['completed', 'current', 'skipped', 'skipped', 'pending', 'pending'],
                 'skipped_phases' => ['picked_packed', 'shipping_preparation'],
                 'elapsed_time' => '2h 10m',
                 'conditions' => ['Customer Pickup'],
@@ -454,9 +454,9 @@ class ErpOrderService
                 'order_number' => 'ORD-100126',
                 'customer' => 'Delta Hardware',
                 'order_date' => '2025-05-13 16:20',
-                'current_phase' => 'shipped',
-                'current_phase_index' => 6,
-                'phase_states' => ['completed', 'completed', 'completed', 'completed', 'completed', 'current', 'pending'],
+                'current_phase' => 'shipping_preparation',
+                'current_phase_index' => 4,
+                'phase_states' => ['completed', 'completed', 'completed', 'current', 'pending', 'pending'],
                 'skipped_phases' => [],
                 'elapsed_time' => '1d 2h',
                 'conditions' => [],
@@ -478,9 +478,7 @@ class ErpOrderService
                     ['phase' => 'Received', 'at' => '2025-05-13 16:20'],
                     ['phase' => 'Ready to Pick', 'at' => '2025-05-13 17:00'],
                     ['phase' => 'Picked & Packed', 'at' => '2025-05-13 18:30'],
-                    ['phase' => 'Shipping Preparation', 'at' => '2025-05-14 07:00'],
-                    ['phase' => 'Invoiced', 'at' => '2025-05-14 08:00'],
-                    ['phase' => 'Shipped', 'at' => '2025-05-14 09:05'],
+                    ['phase' => 'Shipping Preparation', 'at' => '2025-05-14 09:05'],
                 ],
                 'additional' => [
                     'sales_order' => 'SO-88801',
@@ -497,14 +495,14 @@ class ErpOrderService
                 'order_date' => '2025-05-14 06:50',
                 'current_phase' => 'invoiced',
                 'current_phase_index' => 5,
-                'phase_states' => ['completed', 'completed', 'completed', 'completed', 'current', 'pending', 'pending'],
+                'phase_states' => ['completed', 'completed', 'completed', 'completed', 'completed', 'completed'],
                 'skipped_phases' => [],
                 'elapsed_time' => '3h 05m',
                 'conditions' => ['Backordered'],
                 'last_updated' => '2025-05-14 09:40',
-                'is_completed' => false,
+                'is_completed' => true,
                 'is_delayed' => false,
-                'completed_today' => false,
+                'completed_today' => true,
                 'items' => [
                     ['item' => 'Sensor Pack', 'sku' => 'SNS-9', 'ordered' => 8, 'ship_qty' => 8, 'bo_qty' => 0, 'status' => 'done'],
                 ],
@@ -521,6 +519,7 @@ class ErpOrderService
                     ['phase' => 'Picked & Packed', 'at' => '2025-05-14 08:00'],
                     ['phase' => 'Shipping Preparation', 'at' => '2025-05-14 08:45'],
                     ['phase' => 'Invoiced', 'at' => '2025-05-14 09:40'],
+                    ['phase' => 'Completed', 'at' => '2025-05-14 09:40'],
                 ],
                 'additional' => [
                     'sales_order' => 'SO-88940',
@@ -536,8 +535,8 @@ class ErpOrderService
                 'customer' => 'Summit Traders',
                 'order_date' => '2025-05-14 05:30',
                 'current_phase' => 'completed',
-                'current_phase_index' => 7,
-                'phase_states' => ['completed', 'completed', 'completed', 'completed', 'completed', 'completed', 'completed'],
+                'current_phase_index' => 6,
+                'phase_states' => ['completed', 'completed', 'completed', 'completed', 'completed', 'completed'],
                 'skipped_phases' => [],
                 'elapsed_time' => '4h 20m',
                 'conditions' => [],

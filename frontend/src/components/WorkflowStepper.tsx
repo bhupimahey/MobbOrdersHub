@@ -7,25 +7,24 @@ import {
   Package,
   Scale,
   ShoppingCart,
-  Truck,
 } from 'lucide-react'
 import { PHASES_META } from '../types'
 
-const icons = [ClipboardList, ShoppingCart, Package, Scale, FileText, Truck, CheckCircle2]
+const icons = [ClipboardList, ShoppingCart, Package, Scale, FileText, CheckCircle2]
 
 /** Brand colors matching the reference workflow artwork */
-const colors = ['blue', 'green', 'green', 'purple', 'orange', 'blue', 'green'] as const
+const colors = ['blue', 'green', 'green', 'purple', 'orange', 'green'] as const
 
 /**
- * Demo progress on the top track (matches reference screenshot):
- * steps 1–3 completed, 4 current, 5–7 upcoming.
+ * Demo progress on the top track:
+ * steps 1–3 completed, 4 current, 5–6 upcoming.
  */
-const TRACK_STATE = ['done', 'done', 'done', 'current', 'upcoming', 'upcoming', 'upcoming'] as const
+const TRACK_STATE = ['done', 'done', 'done', 'current', 'upcoming', 'upcoming'] as const
 
 export default function WorkflowStepper() {
   return (
     <div className="panel workflow-panel">
-      <div className="panel-header">Order Process Workflow (7 Main Phases)</div>
+      <div className="panel-header">Order Process Workflow (6 Main Phases)</div>
 
       <div className="workflow">
         {PHASES_META.map((phase, index) => {

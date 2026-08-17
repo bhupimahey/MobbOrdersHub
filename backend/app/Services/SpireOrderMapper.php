@@ -10,7 +10,6 @@ class SpireOrderMapper
         'picked_packed',
         'shipping_preparation',
         'invoiced',
-        'shipped',
         'completed',
     ];
 
@@ -74,14 +73,15 @@ class SpireOrderMapper
             'order_date' => $created,
             'current_phase' => $phase,
             'current_phase_index' => $phaseIndex + 1,
-            'phase_states' => $this->phaseStates($phaseIndex),
+            'phase_states' => $this->phaseStates($phaseIndex, $phase),
             'skipped_phases' => [],
             'elapsed_time' => $this->elapsed($raw['created'] ?? $raw['orderDate'] ?? null),
             'conditions' => $conditions,
             'last_updated' => $modified,
-            'is_completed' => $phase === 'completed',
+            // Invoiced orders are treated as completed for listings / progress.
+            'is_completed' => $phase === 'completed' || $phase === 'invoiced',
             'is_delayed' => false,
-            'completed_today' => $phase === 'completed' && str_starts_with($modified, date('Y-m-d')),
+            'completed_today' => ($phase === 'completed' || $phase === 'invoiced') && str_starts_with($modified, date('Y-m-d')),
             'items' => $mappedItems,
             'shipping' => $shipping,
             'financial' => $this->mapFinancial($raw),
@@ -207,28 +207,41 @@ class SpireOrderMapper
 
     private function resolvePhase(array $raw): string
     {
-        // Spire custom workflow uses phaseId labels like "PICKED & PACKED"
-        $fromPhaseId = $this->mapSpirePhaseId((string) ($raw['phaseId'] ?? ''));
-        if ($fromPhaseId !== null) {
-            return $fromPhaseId;
-        }
-
         $status = strtolower(trim((string) ($raw['status'] ?? '')));
         $invoiceNo = trim((string) ($raw['invoiceNo'] ?? ''));
+        $freight = (float) ($raw['freight'] ?? 0);
         $shipDate = trim((string) ($raw['shipDate'] ?? ''));
         $tracking = trim((string) ($raw['trackingNo'] ?? ''));
+        $fromPhaseId = $this->mapSpirePhaseId((string) ($raw['phaseId'] ?? ''));
 
         if (str_contains($status, 'complete') || str_contains($status, 'closed') || $status === 'c') {
             return 'completed';
         }
-        // Only treat as shipped when Spire has an actual ship date (tracking alone is not enough —
-        // clients often enter a test tracking # before the shipped phase).
-        if ($shipDate !== '' || (str_contains($status, 'ship') && ! str_contains($status, 'prep'))) {
-            return 'shipped';
-        }
-        if ($invoiceNo !== '' || str_contains($status, 'invoice') || $status === 'i') {
+
+        // Invoiced (phaseId or invoice number) — progress shows Invoiced + Completed; listings hide these.
+        if (
+            $invoiceNo !== ''
+            || $fromPhaseId === 'invoiced'
+            || str_contains($status, 'invoice')
+            || $status === 'i'
+        ) {
             return 'invoiced';
         }
+
+        // Shipping preparation from Spire phase or when freight has been applied.
+        if ($fromPhaseId === 'shipping_preparation' || $freight > 0) {
+            return 'shipping_preparation';
+        }
+
+        // Legacy ship date / ship status → shipping preparation (Shipped phase removed).
+        if ($shipDate !== '' || (str_contains($status, 'ship') && ! str_contains($status, 'prep'))) {
+            return 'shipping_preparation';
+        }
+
+        if ($fromPhaseId !== null) {
+            return $fromPhaseId;
+        }
+
         if (str_contains($status, 'pack') || str_contains($status, 'pick')) {
             return str_contains($status, 'pack') ? 'picked_packed' : 'ready_to_pick';
         }
@@ -279,7 +292,8 @@ class SpireOrderMapper
             'received' => 'received',
             'invoiced' => 'invoiced',
             'invoice' => 'invoiced',
-            'shipped' => 'shipped',
+            // Legacy Spire "shipped" maps into shipping preparation (6-phase workflow).
+            'shipped' => 'shipping_preparation',
             'completed' => 'completed',
             'complete' => 'completed',
             'closed' => 'completed',
@@ -298,8 +312,13 @@ class SpireOrderMapper
         return null;
     }
 
-    private function phaseStates(int $currentIndex): array
+    private function phaseStates(int $currentIndex, string $phase): array
     {
+        // Invoiced and Completed both mark every phase done (including Completed).
+        if ($phase === 'completed' || $phase === 'invoiced') {
+            return array_fill(0, count(self::PHASES), 'completed');
+        }
+
         $states = [];
         foreach (self::PHASES as $i => $_) {
             if ($i < $currentIndex) {
@@ -326,11 +345,18 @@ class SpireOrderMapper
             'picked_packed' => 'Picked & Packed',
             'shipping_preparation' => 'Shipping Preparation',
             'invoiced' => 'Invoiced',
-            'shipped' => 'Shipped',
             'completed' => 'Completed',
         ];
 
-        $idx = array_search($phase, self::PHASES, true) ?: 0;
+        $idx = array_search($phase, self::PHASES, true);
+        if ($idx === false) {
+            $idx = 0;
+        }
+        // Invoiced also surfaces Completed on the timeline.
+        if ($phase === 'invoiced') {
+            $idx = count(self::PHASES) - 1;
+        }
+
         for ($i = 1; $i <= $idx; $i++) {
             $code = self::PHASES[$i];
             $at = $this->formatDate($raw['modified'] ?? $raw['invoiceDate'] ?? $raw['shipDate'] ?? $created);
