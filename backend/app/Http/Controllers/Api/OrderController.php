@@ -14,6 +14,9 @@ class OrderController extends Controller
     public function index(Request $request): JsonResponse
     {
         $filters = $request->only(['search', 'status', 'date_from', 'date_to', 'limit', 'page']);
+        if ($request->boolean('fresh')) {
+            $filters['fresh'] = true;
+        }
 
         return response()->json(
             $this->orders->listOrders($request->user(), $filters)

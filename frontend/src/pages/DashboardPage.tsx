@@ -17,7 +17,7 @@ import type { DashboardData, Order } from '../types'
 import { PHASES_META } from '../types'
 
 function readDashboardCache(): DashboardData | null {
-  const fromPage = readPageCache<DashboardData>('dashboard', 90_000)
+  const fromPage = readPageCache<DashboardData>('dashboard', 15_000)
   if (fromPage) return fromPage
   try {
     const raw = sessionStorage.getItem(DASH_CACHE_KEY)
@@ -57,13 +57,8 @@ export default function DashboardPage() {
 
   const orders = useMemo(() => {
     let list: Order[] = data?.orders ?? []
-    // Dashboard shows open workflow only — hide Completed / Invoiced orders.
-    list = list.filter(
-      (o) =>
-        o.current_phase !== 'completed' &&
-        o.current_phase !== 'invoiced' &&
-        !o.is_completed,
-    )
+    // Hide fully Completed only — today's Invoiced stay visible with progress done.
+    list = list.filter((o) => o.current_phase !== 'completed')
     if (status !== 'all') {
       list = list.filter((o) => o.current_phase === status)
     }
@@ -93,7 +88,7 @@ export default function DashboardPage() {
         <div>
           <h1>Mobb Medical Orders Dashboard</h1>
           <p>
-            Open orders (excludes Completed)
+            Open orders + today’s Invoiced
             {data?.using_mock ? ' · Mock data' : ''}
             {loading && data ? ' · Refreshing…' : ''}
             {!loading ? ` · ${orders.length} shown` : ''}
@@ -111,7 +106,7 @@ export default function DashboardPage() {
           </div>
           <select className="select" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="all">All Status</option>
-            {PHASES_META.filter((p) => p.code !== 'completed' && p.code !== 'invoiced').map((p) => (
+            {PHASES_META.filter((p) => p.code !== 'completed').map((p) => (
               <option key={p.code} value={p.code}>
                 {p.name}
               </option>

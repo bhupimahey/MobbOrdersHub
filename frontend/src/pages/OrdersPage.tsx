@@ -15,7 +15,7 @@ function orderDay(value: string): string {
 }
 
 export default function OrdersPage() {
-  const cached = readPageCache<{ orders: Order[]; usingMock: boolean }>(CACHE_KEY, 90_000)
+  const cached = readPageCache<{ orders: Order[]; usingMock: boolean }>(CACHE_KEY, 15_000)
   const [allOrders, setAllOrders] = useState<Order[]>(cached?.orders ?? [])
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
@@ -32,7 +32,8 @@ export default function OrdersPage() {
       if (!cached) setLoading(true)
       setError('')
       try {
-        const { data } = await api.get('/orders', { params: { limit: 200, page: 1 } })
+        // fresh=1 bypasses Spire list cache so Hub matches portal quickly after invoice/save.
+        const { data } = await api.get('/orders', { params: { limit: 200, page: 1, fresh: 1 } })
         if (cancelled) return
         const list = data.data ?? []
         setAllOrders(list)
@@ -59,13 +60,8 @@ export default function OrdersPage() {
   }, [reloadKey])
 
   const filtered = useMemo(() => {
-    // Open workflow only — hide invoiced/completed orders from the listing.
-    let list = allOrders.filter(
-      (o) =>
-        o.current_phase !== 'completed' &&
-        o.current_phase !== 'invoiced' &&
-        !o.is_completed,
-    )
+    // Hide Completed only — today's Invoiced (from sales/invoices) stay visible.
+    let list = allOrders.filter((o) => o.current_phase !== 'completed')
     if (status !== 'all') {
       list = list.filter((o) => o.current_phase === status)
     }
@@ -90,7 +86,7 @@ export default function OrdersPage() {
         <div>
           <h1>Orders</h1>
           <p>
-            All orders from the ERP API (excludes Completed / Invoiced)
+            All orders from the ERP API (excludes Completed; includes today’s Invoiced)
             {usingMock ? ' · Mock data' : ''}
             {loading && allOrders.length > 0 ? ' · Refreshing…' : ''}
             {!loading ? ` · ${filtered.length} shown` : ''}
@@ -108,7 +104,7 @@ export default function OrdersPage() {
           </div>
           <select className="select" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="all">All Status</option>
-            {PHASES_META.filter((p) => p.code !== 'completed' && p.code !== 'invoiced').map((p) => (
+            {PHASES_META.filter((p) => p.code !== 'completed').map((p) => (
               <option key={p.code} value={p.code}>
                 {p.name}
               </option>

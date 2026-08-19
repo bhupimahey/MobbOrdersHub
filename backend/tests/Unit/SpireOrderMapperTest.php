@@ -148,6 +148,37 @@ class SpireOrderMapperTest extends TestCase
         $this->assertContains('Completed', $phases);
     }
 
+    public function test_map_invoice_from_sales_history(): void
+    {
+        $mapper = new SpireOrderMapper;
+        $mapped = $mapper->mapInvoice([
+            'id' => 9001,
+            'invoiceNo' => '00009999',
+            'orderNo' => 'E0007736-0',
+            'invoiceDate' => date('Y-m-d').'T15:30:00',
+            'orderDate' => '2026-07-10',
+            'customer' => ['name' => 'TEST COMPANY (SAN)'],
+            'freight' => '12.5',
+            'items' => [
+                [
+                    'partNo' => 'T9012-BL-XS',
+                    'description' => 'The Katrina Black XS',
+                    'orderQty' => '1',
+                    'committedQty' => '1',
+                    'backorderQty' => '0',
+                ],
+            ],
+        ]);
+
+        $this->assertSame('invoiced', $mapped['current_phase']);
+        $this->assertTrue($mapped['is_completed']);
+        $this->assertTrue($mapped['completed_today']);
+        $this->assertSame('invoice', $mapped['spire']['source']);
+        $this->assertSame('00009999', $mapped['spire']['invoice_no']);
+        $this->assertSame('E0007736-0', $mapped['order_number']);
+        $this->assertContains('Completed', array_column($mapped['timeline'], 'phase'));
+    }
+
     public function test_ship_date_maps_to_shipping_preparation_not_shipped(): void
     {
         $mapper = new SpireOrderMapper;

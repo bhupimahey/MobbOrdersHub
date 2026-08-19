@@ -18,6 +18,42 @@ class SpireOrderMapper
         return array_map(fn (array $row) => $this->mapOrder($row), $records);
     }
 
+    /**
+     * Map a Spire sales invoice (history) record to Hub order shape.
+     * Invoiced documents leave sales/orders — phase is always Invoiced (+ Completed progress).
+     */
+    public function mapInvoice(array $raw, array $items = []): array
+    {
+        $normalized = $raw;
+        $invoiceNo = trim((string) ($raw['invoiceNo'] ?? $raw['invoiceNumber'] ?? ''));
+        if ($invoiceNo === '') {
+            $invoiceNo = (string) ($raw['id'] ?? '');
+        }
+
+        $normalized['invoiceNo'] = $invoiceNo;
+        $normalized['phaseId'] = 'INVOICED';
+        $normalized['status'] = $raw['status'] ?? 'I';
+        // Prefer original sales order number when Spire provides it.
+        if (empty($normalized['orderNo']) && ! empty($raw['salesOrderNo'])) {
+            $normalized['orderNo'] = $raw['salesOrderNo'];
+        }
+        if (empty($normalized['orderDate']) && ! empty($raw['invoiceDate'])) {
+            $normalized['orderDate'] = $raw['invoiceDate'];
+        }
+        if (empty($normalized['modified']) && ! empty($raw['invoiceDate'])) {
+            $normalized['modified'] = $raw['invoiceDate'];
+        }
+
+        $mapped = $this->mapOrder($normalized, $items !== [] ? $items : ($raw['items'] ?? []));
+        $mapped['spire'] = array_merge($mapped['spire'] ?? [], [
+            'source' => 'invoice',
+            'invoice_id' => $raw['id'] ?? null,
+            'invoice_no' => $invoiceNo,
+        ]);
+
+        return $mapped;
+    }
+
     public function mapOrder(array $raw, array $items = []): array
     {
         $phase = $this->resolvePhase($raw);
@@ -218,7 +254,7 @@ class SpireOrderMapper
             return 'completed';
         }
 
-        // Invoiced (phaseId or invoice number) — progress shows Invoiced + Completed; listings hide these.
+        // Invoiced (phaseId, invoice number, or sales/invoices source) — progress shows Invoiced + Completed.
         if (
             $invoiceNo !== ''
             || $fromPhaseId === 'invoiced'

@@ -464,47 +464,218 @@ class SpireApiClient
         return true;
     }
 
-    public function listSalesOrders(array $query = []): array
+    public function listSalesOrders(array $query = [], bool $fresh = false): array
     {
         $query = array_merge([
             'start' => 0,
             'limit' => 50,
         ], $query);
 
+        $this->normalizeFilterQuery($query);
+
+        if ($fresh) {
+            return $this->fetchSalesOrdersList($query);
+        }
+
         $cacheKey = 'spire:orders:'.$this->cacheGen().':'.md5(json_encode($query).'|'.$this->company());
 
-        return Cache::remember($cacheKey, 15, function () use ($query) {
-            $response = $this->get($this->companyPath('sales/orders/'), $query);
-
-            if (! $response->successful()) {
-                Log::warning('Spire list sales orders failed', [
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                ]);
-
-                return [
-                    'records' => [],
-                    'error' => 'Failed to fetch sales orders from Spire (HTTP '.$response->status().').',
-                    'status' => $response->status(),
-                ];
-            }
-
-            $payload = $response->json() ?? [];
-
-            return [
-                'records' => $payload['records'] ?? [],
-                'count' => $payload['count'] ?? null,
-                'start' => $payload['start'] ?? 0,
-                'limit' => $payload['limit'] ?? null,
-            ];
+        // Short TTL so Hub tracks Spire closely; Refresh uses $fresh=true (no cache).
+        return Cache::remember($cacheKey, 3, function () use ($query) {
+            return $this->fetchSalesOrdersList($query);
         });
     }
 
-    public function getSalesOrder(string|int $orderId): ?array
+    private function fetchSalesOrdersList(array $query): array
     {
+        $response = $this->get($this->companyPath('sales/orders/'), $query);
+
+        if (! $response->successful()) {
+            Log::warning('Spire list sales orders failed', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+
+            return [
+                'records' => [],
+                'error' => 'Failed to fetch sales orders from Spire (HTTP '.$response->status().').',
+                'status' => $response->status(),
+            ];
+        }
+
+        $payload = $response->json() ?? [];
+
+        return [
+            'records' => $payload['records'] ?? [],
+            'count' => $payload['count'] ?? null,
+            'start' => $payload['start'] ?? 0,
+            'limit' => $payload['limit'] ?? null,
+        ];
+    }
+
+    /**
+     * Today's (and recent) sales invoices — invoiced orders leave sales/orders and live here.
+     */
+    public function listSalesInvoices(array $query = [], bool $fresh = false): array
+    {
+        $query = array_merge([
+            'start' => 0,
+            'limit' => 100,
+        ], $query);
+
+        $this->normalizeFilterQuery($query);
+
+        if ($fresh) {
+            return $this->fetchSalesInvoicesList($query);
+        }
+
+        $cacheKey = 'spire:invoices:'.$this->cacheGen().':'.md5(json_encode($query).'|'.$this->company());
+
+        return Cache::remember($cacheKey, 3, function () use ($query) {
+            return $this->fetchSalesInvoicesList($query);
+        });
+    }
+
+    /**
+     * Invoices for a calendar day (office-local Y-m-d). Falls back to client-side date filter.
+     */
+    public function listInvoicesForDate(string $dateYmd, int $limit = 100, bool $fresh = false): array
+    {
+        $dateYmd = substr($dateYmd, 0, 10);
+        $result = $this->listSalesInvoices([
+            'start' => 0,
+            'limit' => $limit,
+            'filter' => ['invoiceDate' => $dateYmd],
+        ], $fresh);
+
+        $records = $result['records'] ?? [];
+        if ($records === [] && empty($result['error'])) {
+            // Some Spire builds ignore filter — pull recent and filter locally.
+            $result = $this->listSalesInvoices([
+                'start' => 0,
+                'limit' => $limit,
+            ], $fresh);
+            $records = $result['records'] ?? [];
+        }
+
+        $filtered = array_values(array_filter($records, function ($row) use ($dateYmd) {
+            if (! is_array($row)) {
+                return false;
+            }
+            foreach (['invoiceDate', 'orderDate', 'modified', 'created'] as $field) {
+                $value = substr((string) ($row[$field] ?? ''), 0, 10);
+                if ($value === $dateYmd) {
+                    return true;
+                }
+            }
+
+            return false;
+        }));
+
+        $result['records'] = $filtered;
+
+        return $result;
+    }
+
+    public function getSalesInvoice(string|int $invoiceId): ?array
+    {
+        $cacheKey = 'spire:invoice:'.$this->cacheGen().':'.$this->company().':'.$invoiceId;
+
+        return Cache::remember($cacheKey, 5, function () use ($invoiceId) {
+            return $this->fetchSalesInvoice($invoiceId);
+        });
+    }
+
+    public function getSalesInvoiceFresh(string|int $invoiceId): ?array
+    {
+        $raw = $this->fetchSalesInvoice($invoiceId);
+        if ($raw) {
+            $cacheKey = 'spire:invoice:'.$this->cacheGen().':'.$this->company().':'.$invoiceId;
+            Cache::put($cacheKey, $raw, 5);
+        }
+
+        return $raw;
+    }
+
+    private function fetchSalesInvoice(string|int $invoiceId): ?array
+    {
+        $response = $this->get($this->companyPath('sales/invoices/'.$invoiceId));
+
+        if (! $response->successful()) {
+            Log::warning('Spire get sales invoice failed', [
+                'invoice_id' => $invoiceId,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+
+            return null;
+        }
+
+        return $response->json();
+    }
+
+    /**
+     * Best-effort invoice line items (embedded or invoice_items collection).
+     */
+    public function getSalesInvoiceItems(string|int $invoiceId, ?array $detail = null): array
+    {
+        $detail ??= $this->getSalesInvoice($invoiceId);
+
+        if (is_array($detail)) {
+            foreach (['items', 'items.records', 'invoiceItems'] as $key) {
+                $items = data_get($detail, $key);
+                if (is_array($items) && $items !== [] && array_is_list($items)) {
+                    return $items;
+                }
+                if (is_array($items) && isset($items['records']) && is_array($items['records'])) {
+                    return $items['records'];
+                }
+            }
+        }
+
+        $response = $this->get($this->companyPath('sales/invoice_items/'), [
+            'start' => 0,
+            'limit' => 200,
+            'filter' => json_encode(['invoice' => ['id' => (int) $invoiceId]]),
+        ]);
+
+        if ($response->successful()) {
+            $payload = $response->json() ?? [];
+            $records = $payload['records'] ?? [];
+            if (is_array($records) && $records !== []) {
+                return $records;
+            }
+        }
+
+        // Fallback: search by invoice id / number via q
+        $response = $this->get($this->companyPath('sales/invoice_items/'), [
+            'start' => 0,
+            'limit' => 200,
+            'q' => (string) $invoiceId,
+        ]);
+
+        if ($response->successful()) {
+            return ($response->json() ?? [])['records'] ?? [];
+        }
+
+        return [];
+    }
+
+    private function normalizeFilterQuery(array &$query): void
+    {
+        if (isset($query['filter']) && is_array($query['filter'])) {
+            $query['filter'] = json_encode($query['filter']);
+        }
+    }
+
+    public function getSalesOrder(string|int $orderId, bool $fresh = false): ?array
+    {
+        if ($fresh) {
+            return $this->getSalesOrderFresh($orderId);
+        }
+
         $cacheKey = 'spire:order:'.$this->cacheGen().':'.$this->company().':'.$orderId;
 
-        return Cache::remember($cacheKey, 60, function () use ($orderId) {
+        return Cache::remember($cacheKey, 5, function () use ($orderId) {
             return $this->fetchSalesOrder($orderId);
         });
     }
@@ -515,7 +686,7 @@ class SpireApiClient
         $raw = $this->fetchSalesOrder($orderId);
         if ($raw) {
             $cacheKey = 'spire:order:'.$this->cacheGen().':'.$this->company().':'.$orderId;
-            Cache::put($cacheKey, $raw, 60);
+            Cache::put($cacheKey, $raw, 5);
         }
 
         return $raw;

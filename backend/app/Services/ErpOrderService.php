@@ -17,6 +17,8 @@ class ErpOrderService
 
     public function listOrders(?User $user = null, array $filters = []): array
     {
+        $fresh = ! empty($filters['fresh']);
+
         if ($this->useMock()) {
             $orders = $this->mockOrders();
             $filtered = $this->filterForUser($orders, $user, $filters);
@@ -41,6 +43,10 @@ class ErpOrderService
             ];
         }
 
+        if ($fresh) {
+            SpireApiClient::flushOrderCache();
+        }
+
         $limit = max(1, min(200, (int) ($filters['limit'] ?? 50)));
         $page = max(1, (int) ($filters['page'] ?? 1));
         $start = ($page - 1) * $limit;
@@ -54,7 +60,7 @@ class ErpOrderService
             $query['q'] = $filters['search'];
         }
 
-        $result = $this->spire->listSalesOrders($query);
+        $result = $this->spire->listSalesOrders($query, $fresh);
 
         if (! empty($result['error'])) {
             return [
@@ -75,6 +81,19 @@ class ErpOrderService
             fn (array $row) => $this->mapper->mapOrder($row, $row['items'] ?? []),
             $records
         );
+
+        // Invoiced docs leave sales/orders — merge today's invoices so Hub can show Invoiced + Completed.
+        $invoiceResult = $this->spire->listInvoicesForDate(date('Y-m-d'), 100, $fresh);
+        $invoiceOrders = [];
+        foreach ($invoiceResult['records'] ?? [] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $invoiceOrders[] = $this->mapper->mapInvoice($row, $row['items'] ?? []);
+        }
+
+        $orders = $this->mergeOrdersPreferringInvoices($orders, $invoiceOrders);
+
         $filtered = $this->filterForUser($orders, $user, $filters);
         $spireCount = $result['count'] ?? null;
 
@@ -82,10 +101,46 @@ class ErpOrderService
             'page' => $page,
             'per_page' => $limit,
             'spire_count' => $spireCount,
+            'invoice_count' => count($invoiceOrders),
             'start' => $start,
+            'fresh' => $fresh,
         ]);
 
         return $filtered;
+    }
+
+    /**
+     * Prefer invoice-mapped rows when the same order/invoice appears in both collections.
+     *
+     * @param  array<int, array<string, mixed>>  $orders
+     * @param  array<int, array<string, mixed>>  $invoiceOrders
+     * @return array<int, array<string, mixed>>
+     */
+    private function mergeOrdersPreferringInvoices(array $orders, array $invoiceOrders): array
+    {
+        $byKey = [];
+
+        foreach ($orders as $order) {
+            $key = $this->orderMergeKey($order);
+            $byKey[$key] = $order;
+        }
+
+        foreach ($invoiceOrders as $order) {
+            $key = $this->orderMergeKey($order);
+            $byKey[$key] = $order;
+        }
+
+        return array_values($byKey);
+    }
+
+    private function orderMergeKey(array $order): string
+    {
+        $orderNo = trim((string) ($order['order_number'] ?? ''));
+        if ($orderNo !== '') {
+            return 'no:'.$orderNo;
+        }
+
+        return 'id:'.(string) ($order['id'] ?? uniqid('o', true));
     }
 
     /**
@@ -109,7 +164,7 @@ class ErpOrderService
 
         $raw = $this->spire->getSalesOrderFresh($orderId);
         if (! $raw) {
-            $list = $this->spire->listSalesOrders(['q' => $orderId, 'limit' => 5]);
+            $list = $this->spire->listSalesOrders(['q' => $orderId, 'limit' => 5], true);
             $match = collect($list['records'] ?? [])->first(function ($row) use ($orderId) {
                 return (string) ($row['id'] ?? '') === $orderId
                     || (string) ($row['orderNo'] ?? '') === $orderId;
@@ -121,6 +176,12 @@ class ErpOrderService
             }
         }
 
+        $source = 'spire_order';
+        if (! is_array($raw)) {
+            $raw = $this->findInvoiceRaw($orderId, true);
+            $source = is_array($raw) ? 'spire_invoice' : $source;
+        }
+
         if (! is_array($raw)) {
             return null;
         }
@@ -128,11 +189,15 @@ class ErpOrderService
         // Bust list cache so the next orders listing remaps with latest phaseId.
         SpireApiClient::flushOrderCache();
 
+        $mapped = $source === 'spire_invoice'
+            ? $this->mapper->mapInvoice($raw, $raw['items'] ?? [])
+            : $this->mapper->mapOrder($raw, $raw['items'] ?? []);
+
         return [
-            'source' => 'spire',
+            'source' => $source,
             'order_id' => $raw['id'] ?? $orderId,
             'order_no' => $raw['orderNo'] ?? null,
-            'mapped_phase' => $this->mapper->mapOrder($raw, $raw['items'] ?? [])['current_phase'] ?? null,
+            'mapped_phase' => $mapped['current_phase'] ?? null,
             'order' => $raw,
         ];
     }
@@ -148,23 +213,68 @@ class ErpOrderService
             return null;
         }
 
-        $raw = $this->spire->getSalesOrder($orderId);
+        $raw = $this->spire->getSalesOrder($orderId, true);
         if (! $raw) {
             // Try search by order number if numeric id lookup failed
-            $list = $this->spire->listSalesOrders(['q' => $orderId, 'limit' => 5]);
+            $list = $this->spire->listSalesOrders(['q' => $orderId, 'limit' => 5], true);
             $raw = collect($list['records'] ?? [])->first(function ($row) use ($orderId) {
                 return (string) ($row['id'] ?? '') === $orderId
                     || (string) ($row['orderNo'] ?? '') === $orderId;
             });
         }
 
-        if (! is_array($raw)) {
+        if (is_array($raw)) {
+            $items = $this->spire->getSalesOrderItems($raw['id'] ?? $orderId, $raw['orderNo'] ?? null, $raw);
+
+            return $this->mapper->mapOrder($raw, $items);
+        }
+
+        // Invoiced orders leave sales/orders — resolve from sales/invoices.
+        $invoice = $this->findInvoiceRaw($orderId, true);
+        if (! is_array($invoice)) {
             return null;
         }
 
-        $items = $this->spire->getSalesOrderItems($raw['id'] ?? $orderId, $raw['orderNo'] ?? null, $raw);
+        $items = $this->spire->getSalesInvoiceItems($invoice['id'] ?? $orderId, $invoice);
 
-        return $this->mapper->mapOrder($raw, $items);
+        return $this->mapper->mapInvoice($invoice, $items);
+    }
+
+    /**
+     * Locate a Spire invoice by id, invoiceNo, or original orderNo.
+     */
+    private function findInvoiceRaw(string $orderId, bool $fresh = false): ?array
+    {
+        $direct = $fresh
+            ? $this->spire->getSalesInvoiceFresh($orderId)
+            : $this->spire->getSalesInvoice($orderId);
+        if (is_array($direct)) {
+            return $direct;
+        }
+
+        $list = $this->spire->listSalesInvoices(['q' => $orderId, 'limit' => 10], $fresh);
+        $match = collect($list['records'] ?? [])->first(function ($row) use ($orderId) {
+            if (! is_array($row)) {
+                return false;
+            }
+
+            return (string) ($row['id'] ?? '') === $orderId
+                || (string) ($row['invoiceNo'] ?? '') === $orderId
+                || (string) ($row['orderNo'] ?? '') === $orderId
+                || (string) ($row['salesOrderNo'] ?? '') === $orderId;
+        });
+
+        if (! is_array($match)) {
+            return null;
+        }
+
+        if (! empty($match['id'])) {
+            return ($fresh
+                ? $this->spire->getSalesInvoiceFresh((string) $match['id'])
+                : $this->spire->getSalesInvoice((string) $match['id'])) ?? $match;
+        }
+
+        return $match;
     }
 
     public function getStatus(string $orderId): ?array
@@ -245,9 +355,9 @@ class ErpOrderService
             'customer_pickup' => collect($orders)->filter(fn ($o) => in_array('Customer Pickup', $o['conditions'] ?? [], true))->count(),
         ];
 
-        // Open orders only for the dashboard (hide Completed).
+        // Open workflow on dashboard — hide Completed only; keep today's Invoiced visible.
         $latestOrders = collect($orders)
-            ->filter(fn ($o) => ! in_array($o['current_phase'] ?? '', ['completed', 'invoiced'], true) && empty($o['is_completed']))
+            ->filter(fn ($o) => ($o['current_phase'] ?? '') !== 'completed')
             ->sortByDesc(fn ($o) => $o['order_date'] ?? $o['last_updated'] ?? '')
             ->values()
             ->all();
