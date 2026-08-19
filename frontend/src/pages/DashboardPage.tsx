@@ -88,7 +88,7 @@ export default function DashboardPage() {
         <div>
           <h1>Mobb Medical Orders Dashboard</h1>
           <p>
-            Open orders + today’s Invoiced
+            Open orders + today’s Invoiced (same list as Orders)
             {data?.using_mock ? ' · Mock data' : ''}
             {loading && data ? ' · Refreshing…' : ''}
             {!loading ? ` · ${orders.length} shown` : ''}

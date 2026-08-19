@@ -340,27 +340,29 @@ class ErpOrderService
 
     public function dashboardSummary(?User $user = null): array
     {
-        $result = $this->listOrders($user, ['limit' => 100, 'page' => 1]);
+        // Same list window as Orders page so counters and row counts stay aligned.
+        $result = $this->listOrders($user, ['limit' => 200, 'page' => 1, 'fresh' => true]);
         $orders = $result['data'] ?? [];
 
-        $total = count($orders);
-        $inProgress = collect($orders)->where('is_completed', false)->where('is_delayed', false)->count();
-        $completedToday = collect($orders)->where('completed_today', true)->count();
-        $delayed = collect($orders)->where('is_delayed', true)->count();
-
-        $conditions = [
-            'on_hold' => collect($orders)->filter(fn ($o) => in_array('On Hold', $o['conditions'] ?? [], true))->count(),
-            'backordered' => collect($orders)->filter(fn ($o) => in_array('Backordered', $o['conditions'] ?? [], true))->count(),
-            'cancelled' => collect($orders)->filter(fn ($o) => in_array('Cancelled', $o['conditions'] ?? [], true))->count(),
-            'customer_pickup' => collect($orders)->filter(fn ($o) => in_array('Customer Pickup', $o['conditions'] ?? [], true))->count(),
-        ];
-
-        // Open workflow on dashboard — hide Completed only; keep today's Invoiced visible.
+        // Open workflow — hide Completed only; keep today's Invoiced visible (same as Orders UI).
         $latestOrders = collect($orders)
             ->filter(fn ($o) => ($o['current_phase'] ?? '') !== 'completed')
             ->sortByDesc(fn ($o) => $o['order_date'] ?? $o['last_updated'] ?? '')
             ->values()
             ->all();
+
+        $open = collect($latestOrders);
+        $total = $open->count();
+        $inProgress = $open->where('is_completed', false)->where('is_delayed', false)->count();
+        $completedToday = collect($orders)->where('completed_today', true)->count();
+        $delayed = $open->where('is_delayed', true)->count();
+
+        $conditions = [
+            'on_hold' => $open->filter(fn ($o) => in_array('On Hold', $o['conditions'] ?? [], true))->count(),
+            'backordered' => $open->filter(fn ($o) => in_array('Backordered', $o['conditions'] ?? [], true))->count(),
+            'cancelled' => $open->filter(fn ($o) => in_array('Cancelled', $o['conditions'] ?? [], true))->count(),
+            'customer_pickup' => $open->filter(fn ($o) => in_array('Customer Pickup', $o['conditions'] ?? [], true))->count(),
+        ];
 
         $usingMock = $this->useMock();
 
