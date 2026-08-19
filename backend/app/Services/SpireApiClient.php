@@ -535,6 +535,33 @@ class SpireApiClient
         });
     }
 
+    private function fetchSalesInvoicesList(array $query): array
+    {
+        $response = $this->get($this->companyPath('sales/invoices/'), $query);
+
+        if (! $response->successful()) {
+            Log::warning('Spire list sales invoices failed', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+
+            return [
+                'records' => [],
+                'error' => 'Failed to fetch sales invoices from Spire (HTTP '.$response->status().').',
+                'status' => $response->status(),
+            ];
+        }
+
+        $payload = $response->json() ?? [];
+
+        return [
+            'records' => $payload['records'] ?? [],
+            'count' => $payload['count'] ?? null,
+            'start' => $payload['start'] ?? 0,
+            'limit' => $payload['limit'] ?? null,
+        ];
+    }
+
     /**
      * Invoices for a calendar day (office-local Y-m-d). Falls back to client-side date filter.
      */
