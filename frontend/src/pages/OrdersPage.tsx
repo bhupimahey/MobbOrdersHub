@@ -100,8 +100,8 @@ export default function OrdersPage() {
 
   return (
     <div className="listing-page">
-      <div className="page-header">
-        <div>
+      <div className="page-header listing-page-header">
+        <div className="listing-page-title">
           <h1>Orders</h1>
           <p>
             All orders from the ERP API (excludes Completed; includes today’s Invoiced)
@@ -111,7 +111,7 @@ export default function OrdersPage() {
             {` · ${periodLabel}`}
           </p>
         </div>
-        <div className="toolbar">
+        <div className="toolbar orders-toolbar">
           <div className="search-wrap">
             <Search size={15} className="search-icon" />
             <input
@@ -129,7 +129,7 @@ export default function OrdersPage() {
             ))}
           </select>
           <select
-            className="select"
+            className="select orders-period-select"
             value={period}
             onChange={(e) => onPeriodChange(e.target.value as DatePeriod)}
             aria-label="Date period"
@@ -140,16 +140,18 @@ export default function OrdersPage() {
               </option>
             ))}
           </select>
-          {period === 'custom' ? (
-            <DateRangeFilter
-              dateFrom={dateFrom}
-              dateTo={dateTo}
-              onChange={(from, to) => {
-                setDateFrom(from)
-                setDateTo(to)
-              }}
-            />
-          ) : null}
+          <div className={`orders-custom-range ${period === 'custom' ? 'is-visible' : ''}`}>
+            {period === 'custom' ? (
+              <DateRangeFilter
+                dateFrom={dateFrom}
+                dateTo={dateTo}
+                onChange={(from, to) => {
+                  setDateFrom(from)
+                  setDateTo(to)
+                }}
+              />
+            ) : null}
+          </div>
           <button
             type="button"
             className="btn btn-ghost"

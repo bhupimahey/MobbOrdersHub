@@ -419,14 +419,18 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
 
       <div className="detail-card detail-card-shipping">
         <h5>Shipping Info</h5>
-        {order.shipping ? (
-          <div className="kv kv-stack">
-            <div><span>Carrier</span><strong>{order.shipping.carrier}</strong></div>
-            <div><span>Service</span><strong>{order.shipping.service}</strong></div>
-            <div>
-              <span>Tracking #</span>
-              <strong className="tracking-row">
-                {order.shipping.tracking}
+        <div className="kv kv-stack">
+          <div><span>Sales Order #</span><strong>{order.additional.sales_order || '—'}</strong></div>
+          <div><span>Customer PO #</span><strong>{order.additional.customer_po || '—'}</strong></div>
+          <div><span>Created By</span><strong>{order.additional.created_by || '—'}</strong></div>
+          <div><span>Warehouse</span><strong>{order.additional.warehouse || '—'}</strong></div>
+          <div><span>Carrier</span><strong>{order.shipping?.carrier || '—'}</strong></div>
+          <div><span>Service</span><strong>{order.shipping?.service || '—'}</strong></div>
+          <div>
+            <span>Tracking #</span>
+            <strong className="tracking-row">
+              {order.shipping?.tracking || '—'}
+              {order.shipping?.tracking && order.shipping.tracking !== '—' ? (
                 <button
                   type="button"
                   className="btn btn-icon btn-ghost"
@@ -436,16 +440,12 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
                 >
                   {copied ? <Check size={10} /> : <Copy size={10} />}
                 </button>
-              </strong>
-            </div>
-            <div><span>Weight</span><strong>{order.shipping.weight}</strong></div>
-            <div><span>Est. Delivery</span><strong>{order.shipping.est_delivery}</strong></div>
+              ) : null}
+            </strong>
           </div>
-        ) : (
-          <div className="text-muted" style={{ fontSize: 11 }}>
-            No shipping details yet.
-          </div>
-        )}
+          <div><span>Weight</span><strong>{order.shipping?.weight || '—'}</strong></div>
+          <div><span>Est. Delivery</span><strong>{order.shipping?.est_delivery || '—'}</strong></div>
+        </div>
       </div>
 
       <div className="detail-card detail-card-timeline">
@@ -465,21 +465,6 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
               </div>
             </div>
           ))}
-        </div>
-      </div>
-
-      <div className="detail-card detail-card-additional">
-        <h5>Additional Info</h5>
-        <div className="kv kv-stack">
-          <div><span>Sales Order #</span><strong>{order.additional.sales_order}</strong></div>
-          <div><span>Customer PO #</span><strong>{order.additional.customer_po}</strong></div>
-          <div><span>Created By</span><strong>{order.additional.created_by}</strong></div>
-          <div><span>Warehouse</span><strong>{order.additional.warehouse}</strong></div>
-          <div><span>Terms</span><strong>{order.additional.terms || order.financial?.terms_text || '—'}</strong></div>
-          <div><span>Discount %</span><strong>{order.financial?.discount ?? '—'}</strong></div>
-          <div><span>Freight</span><strong>{order.financial?.freight ?? '—'}</strong></div>
-          <div><span>Total</span><strong>{order.financial?.total ?? '—'}</strong></div>
-          <div><span>Notes</span><strong>{order.additional.notes || '—'}</strong></div>
         </div>
       </div>
     </div>
