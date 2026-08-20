@@ -257,6 +257,7 @@ class SpireOrderMapper
         $freight = (float) ($raw['freight'] ?? 0);
         $shipDate = trim((string) ($raw['shipDate'] ?? ''));
         $tracking = trim((string) ($raw['trackingNo'] ?? ''));
+        $referenceNo = strtolower(trim((string) ($raw['referenceNo'] ?? '')));
         $fromPhaseId = $this->mapSpirePhaseId((string) ($raw['phaseId'] ?? ''));
 
         if (str_contains($status, 'complete') || str_contains($status, 'closed') || $status === 'c') {
@@ -281,6 +282,11 @@ class SpireOrderMapper
         // Legacy ship date / ship status → shipping preparation (Shipped phase removed).
         if ($shipDate !== '' || (str_contains($status, 'ship') && ! str_contains($status, 'prep'))) {
             return 'shipping_preparation';
+        }
+
+        // Picked & Packed from Spire phaseId or Reference No = "Processed".
+        if ($fromPhaseId === 'picked_packed' || $referenceNo === 'processed') {
+            return 'picked_packed';
         }
 
         if ($fromPhaseId !== null) {

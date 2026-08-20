@@ -125,6 +125,23 @@ class SpireOrderMapperTest extends TestCase
         $this->assertSame('received', $mapped['current_phase']);
     }
 
+    public function test_reference_no_processed_means_picked_packed(): void
+    {
+        $mapper = new SpireOrderMapper;
+        $mapped = $mapper->mapOrder([
+            'id' => 21,
+            'orderNo' => 'E-PROC',
+            'status' => 'O',
+            'referenceNo' => 'Processed',
+            'orderDate' => '2026-08-20',
+            'created' => '2026-08-20T14:00:00',
+            'customer' => ['name' => 'Test'],
+        ]);
+
+        $this->assertSame('picked_packed', $mapped['current_phase']);
+        $this->assertSame(3, $mapped['current_phase_index']);
+    }
+
     public function test_freight_moves_to_shipping_preparation(): void
     {
         $mapper = new SpireOrderMapper;

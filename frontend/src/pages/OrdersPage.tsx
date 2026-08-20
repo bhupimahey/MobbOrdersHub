@@ -4,6 +4,11 @@ import api from '../api/client'
 import DateRangeFilter from '../components/DateRangeFilter'
 import OrdersTable from '../components/OrdersTable'
 import PageLoader from '../components/PageLoader'
+import {
+  DATE_PERIOD_OPTIONS,
+  rangeForPeriod,
+  type DatePeriod,
+} from '../lib/datePresets'
 import { matchesStatusFilter, STATUS_FILTER_OPTIONS } from '../lib/orderStatusFilter'
 import { readPageCache, writePageCache } from '../lib/pageCache'
 import type { Order } from '../types'
@@ -19,8 +24,10 @@ export default function OrdersPage() {
   const [allOrders, setAllOrders] = useState<Order[]>(cached?.orders ?? [])
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+  const [period, setPeriod] = useState<DatePeriod>('today')
+  const initialRange = rangeForPeriod('today')
+  const [dateFrom, setDateFrom] = useState(initialRange.from)
+  const [dateTo, setDateTo] = useState(initialRange.to)
   const [loading, setLoading] = useState(!cached)
   const [usingMock, setUsingMock] = useState(cached?.usingMock ?? false)
   const [error, setError] = useState('')
@@ -59,6 +66,14 @@ export default function OrdersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reloadKey])
 
+  const onPeriodChange = (next: DatePeriod) => {
+    setPeriod(next)
+    if (next === 'custom') return
+    const range = rangeForPeriod(next)
+    setDateFrom(range.from)
+    setDateTo(range.to)
+  }
+
   const filtered = useMemo(() => {
     // Hide Completed only — today's Invoiced (from sales/invoices) stay visible.
     let list = allOrders.filter((o) => o.current_phase !== 'completed')
@@ -80,6 +95,9 @@ export default function OrdersPage() {
     )
   }, [allOrders, search, status, dateFrom, dateTo])
 
+  const periodLabel =
+    DATE_PERIOD_OPTIONS.find((o) => o.value === period)?.label ?? 'Today'
+
   return (
     <div className="listing-page">
       <div className="page-header">
@@ -90,6 +108,7 @@ export default function OrdersPage() {
             {usingMock ? ' · Mock data' : ''}
             {loading && allOrders.length > 0 ? ' · Refreshing…' : ''}
             {!loading ? ` · ${filtered.length} shown` : ''}
+            {` · ${periodLabel}`}
           </p>
         </div>
         <div className="toolbar">
@@ -109,14 +128,28 @@ export default function OrdersPage() {
               </option>
             ))}
           </select>
-          <DateRangeFilter
-            dateFrom={dateFrom}
-            dateTo={dateTo}
-            onChange={(from, to) => {
-              setDateFrom(from)
-              setDateTo(to)
-            }}
-          />
+          <select
+            className="select"
+            value={period}
+            onChange={(e) => onPeriodChange(e.target.value as DatePeriod)}
+            aria-label="Date period"
+          >
+            {DATE_PERIOD_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          {period === 'custom' ? (
+            <DateRangeFilter
+              dateFrom={dateFrom}
+              dateTo={dateTo}
+              onChange={(from, to) => {
+                setDateFrom(from)
+                setDateTo(to)
+              }}
+            />
+          ) : null}
           <button
             type="button"
             className="btn btn-ghost"
@@ -140,7 +173,7 @@ export default function OrdersPage() {
           <PageLoader label="Loading orders" />
         ) : (
           <OrdersTable
-            key={`${reloadKey}-${status}-${dateFrom}-${dateTo}-${filtered[0]?.id ?? 'none'}`}
+            key={`${reloadKey}-${status}-${period}-${dateFrom}-${dateTo}-${filtered[0]?.id ?? 'none'}`}
             orders={filtered}
           />
         )}
