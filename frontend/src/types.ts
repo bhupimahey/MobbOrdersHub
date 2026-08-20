@@ -93,6 +93,7 @@ export interface DashboardData {
     in_progress: number
     completed_today: number
     delayed_orders: number
+    today_orders?: number
   }
   conditions: {
     on_hold: number

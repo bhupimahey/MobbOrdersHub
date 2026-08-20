@@ -4,9 +4,9 @@ import api from '../api/client'
 import DateRangeFilter from '../components/DateRangeFilter'
 import OrdersTable from '../components/OrdersTable'
 import PageLoader from '../components/PageLoader'
+import { matchesStatusFilter, STATUS_FILTER_OPTIONS } from '../lib/orderStatusFilter'
 import { readPageCache, writePageCache } from '../lib/pageCache'
 import type { Order } from '../types'
-import { PHASES_META } from '../types'
 
 const CACHE_KEY = 'orders'
 
@@ -63,7 +63,7 @@ export default function OrdersPage() {
     // Hide Completed only — today's Invoiced (from sales/invoices) stay visible.
     let list = allOrders.filter((o) => o.current_phase !== 'completed')
     if (status !== 'all') {
-      list = list.filter((o) => o.current_phase === status)
+      list = list.filter((o) => matchesStatusFilter(o, status))
     }
     if (search.trim()) {
       const q = search.toLowerCase()
@@ -103,10 +103,9 @@ export default function OrdersPage() {
             />
           </div>
           <select className="select" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="all">All Status</option>
-            {PHASES_META.filter((p) => p.code !== 'completed').map((p) => (
-              <option key={p.code} value={p.code}>
-                {p.name}
+            {STATUS_FILTER_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
               </option>
             ))}
           </select>

@@ -356,10 +356,23 @@ class ErpOrderService
             ->all();
 
         $open = collect($latestOrders);
-        $total = $open->count();
         $inProgress = $open->where('is_completed', false)->where('is_delayed', false)->count();
         $completedToday = collect($orders)->where('completed_today', true)->count();
         $delayed = $open->where('is_delayed', true)->count();
+
+        // Total Orders card = today's Sales History (invoices) count.
+        $salesHistoryToday = (int) ($result['meta']['invoice_count'] ?? 0);
+        if ($salesHistoryToday === 0) {
+            $salesHistoryToday = $open->filter(function ($o) {
+                return ($o['current_phase'] ?? '') === 'invoiced'
+                    || (($o['spire']['source'] ?? null) === 'invoice');
+            })->count();
+        }
+
+        $todayYmd = (new \DateTimeImmutable('now', new \DateTimeZone('America/Toronto')))->format('Y-m-d');
+        $todayOrders = $open->filter(function ($o) use ($todayYmd) {
+            return str_starts_with((string) ($o['order_date'] ?? ''), $todayYmd);
+        })->count();
 
         $conditions = [
             'on_hold' => $open->filter(fn ($o) => in_array('On Hold', $o['conditions'] ?? [], true))->count(),
@@ -372,10 +385,11 @@ class ErpOrderService
 
         return [
             'stats' => [
-                'total_orders' => $usingMock ? ($total ?: 128) : $total,
+                'total_orders' => $usingMock ? ($salesHistoryToday ?: 128) : $salesHistoryToday,
                 'in_progress' => $usingMock ? ($inProgress ?: 42) : $inProgress,
                 'completed_today' => $usingMock ? ($completedToday ?: 96) : $completedToday,
                 'delayed_orders' => $usingMock ? ($delayed ?: 5) : $delayed,
+                'today_orders' => $usingMock ? ($todayOrders ?: 13) : $todayOrders,
             ],
             'conditions' => [
                 'on_hold' => $usingMock ? ($conditions['on_hold'] ?: 8) : $conditions['on_hold'],
@@ -384,7 +398,7 @@ class ErpOrderService
                 'customer_pickup' => $usingMock ? ($conditions['customer_pickup'] ?: 6) : $conditions['customer_pickup'],
             ],
             'today' => [
-                'orders_received' => $usingMock ? 32 : $total,
+                'orders_received' => $usingMock ? 32 : $todayOrders,
                 'orders_in_progress' => $usingMock ? ($inProgress ?: 42) : $inProgress,
                 'orders_completed' => $usingMock ? ($completedToday ?: 96) : $completedToday,
                 'delayed_orders' => $usingMock ? ($delayed ?: 5) : $delayed,
@@ -407,8 +421,15 @@ class ErpOrderService
         }
 
         if (! empty($filters['status']) && $filters['status'] !== 'all') {
-            $status = $filters['status'];
-            $collection = $collection->filter(fn ($o) => ($o['current_phase'] ?? '') === $status)->values();
+            $status = (string) $filters['status'];
+            if (str_starts_with($status, 'cond:')) {
+                $label = substr($status, 5);
+                $collection = $collection->filter(
+                    fn ($o) => in_array($label, $o['conditions'] ?? [], true)
+                )->values();
+            } else {
+                $collection = $collection->filter(fn ($o) => ($o['current_phase'] ?? '') === $status)->values();
+            }
         }
 
         if (! empty($filters['search'])) {

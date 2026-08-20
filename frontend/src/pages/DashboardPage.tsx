@@ -2,19 +2,22 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   CheckCircle2,
   ClipboardList,
-  Clock3,
   FileWarning,
+  Package,
+  PauseCircle,
+  PackageX,
+  Ban,
+  UserRound,
   Search,
 } from 'lucide-react'
 import api from '../api/client'
 import WorkflowStepper from '../components/WorkflowStepper'
 import OrdersTable from '../components/OrdersTable'
 import PageLoader from '../components/PageLoader'
-import RightRail from '../components/RightRail'
 import { DASH_CACHE_KEY } from '../context/AuthContext'
+import { matchesStatusFilter, STATUS_FILTER_OPTIONS } from '../lib/orderStatusFilter'
 import { readPageCache, writePageCache } from '../lib/pageCache'
 import type { DashboardData, Order } from '../types'
-import { PHASES_META } from '../types'
 
 function readDashboardCache(): DashboardData | null {
   const fromPage = readPageCache<DashboardData>('dashboard', 15_000)
@@ -24,6 +27,23 @@ function readDashboardCache(): DashboardData | null {
     return raw ? (JSON.parse(raw) as DashboardData) : null
   } catch {
     return null
+  }
+}
+
+function orderDay(value: string): string {
+  return value.slice(0, 10)
+}
+
+function todayTorontoYmd(): string {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Toronto',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date())
+  } catch {
+    return new Date().toISOString().slice(0, 10)
   }
 }
 
@@ -57,10 +77,9 @@ export default function DashboardPage() {
 
   const orders = useMemo(() => {
     let list: Order[] = data?.orders ?? []
-    // Hide fully Completed only — today's Invoiced stay visible with progress done.
     list = list.filter((o) => o.current_phase !== 'completed')
     if (status !== 'all') {
-      list = list.filter((o) => o.current_phase === status)
+      list = list.filter((o) => matchesStatusFilter(o, status))
     }
     if (search.trim()) {
       const q = search.toLowerCase()
@@ -80,7 +99,20 @@ export default function DashboardPage() {
     in_progress: 0,
     completed_today: 0,
     delayed_orders: 0,
+    today_orders: 0,
   }
+  const conditions = data?.conditions ?? {
+    on_hold: 0,
+    backordered: 0,
+    cancelled: 0,
+    customer_pickup: 0,
+  }
+
+  const todayOrders =
+    stats.today_orders ??
+    (data?.orders ?? []).filter(
+      (o) => o.current_phase !== 'completed' && orderDay(o.order_date) === todayTorontoYmd(),
+    ).length
 
   return (
     <div className="dashboard">
@@ -105,22 +137,21 @@ export default function DashboardPage() {
             />
           </div>
           <select className="select" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="all">All Status</option>
-            {PHASES_META.filter((p) => p.code !== 'completed').map((p) => (
-              <option key={p.code} value={p.code}>
-                {p.name}
+            {STATUS_FILTER_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
               </option>
             ))}
           </select>
         </div>
       </div>
 
-      <div className="stats-grid">
+      <div className="stats-grid stats-grid-wide">
         <div className="stat-card">
           <div>
             <div className="label">Total Orders</div>
             <div className="value">{stats.total_orders}</div>
-            <div className="sub">All Time</div>
+            <div className="sub">Sales History today</div>
           </div>
           <div className="stat-icon blue"><ClipboardList size={18} /></div>
         </div>
@@ -142,15 +173,44 @@ export default function DashboardPage() {
         </div>
         <div className="stat-card">
           <div>
-            <div className="label">Delayed Orders</div>
-            <div className="value">{stats.delayed_orders}</div>
-            <div className="sub">Need Attention</div>
+            <div className="label">Today Orders</div>
+            <div className="value">{todayOrders}</div>
+            <div className="sub">Ordered today</div>
           </div>
-          <div className="stat-icon red"><Clock3 size={18} /></div>
+          <div className="stat-icon blue"><Package size={18} /></div>
+        </div>
+        <div className="stat-card">
+          <div>
+            <div className="label">Customer Pickup</div>
+            <div className="value">{conditions.customer_pickup}</div>
+            <div className="sub">Pickup at warehouse</div>
+          </div>
+          <div className="stat-icon blue"><UserRound size={18} /></div>
         </div>
       </div>
 
-      <div className="dashboard-body">
+      <div className="conditions-strip">
+        <div className="conditions-strip-title">Order Conditions</div>
+        <div className="conditions-strip-items">
+          <div className="condition-chip">
+            <PauseCircle size={14} />
+            <span>On Hold</span>
+            <strong>{conditions.on_hold}</strong>
+          </div>
+          <div className="condition-chip">
+            <PackageX size={14} />
+            <span>Backordered</span>
+            <strong>{conditions.backordered}</strong>
+          </div>
+          <div className="condition-chip">
+            <Ban size={14} />
+            <span>Cancelled</span>
+            <strong>{conditions.cancelled}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div className="dashboard-body dashboard-body-full">
         <div className="dashboard-center">
           <WorkflowStepper />
           <div className="orders-full">
@@ -161,10 +221,6 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
-        <RightRail
-          conditions={data?.conditions}
-          today={data?.today}
-        />
       </div>
     </div>
   )

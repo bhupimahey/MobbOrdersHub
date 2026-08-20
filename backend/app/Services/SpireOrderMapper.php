@@ -78,8 +78,13 @@ class SpireOrderMapper
         if (! empty($raw['hold'])) {
             $conditions[] = 'On Hold';
         }
-        if (! empty($raw['backordered'])) {
+        if (! empty($raw['backordered']) || ! empty($raw['totalBackorderQty'])) {
             $conditions[] = 'Backordered';
+        }
+
+        $statusRaw = strtolower(trim((string) ($raw['status'] ?? '')));
+        if (str_contains($statusRaw, 'cancel') || $statusRaw === 'x') {
+            $conditions[] = 'Cancelled';
         }
 
         $shipCode = (string) data_get($raw, 'shippingAddress.shipCode', '');
