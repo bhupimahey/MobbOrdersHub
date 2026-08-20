@@ -1243,7 +1243,7 @@ table.data tbody tr.expanded {
 
 .detail-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 0.95fr);
+  grid-template-columns: minmax(0, 2.2fr) minmax(0, 0.75fr) minmax(0, 0.7fr);
   gap: 10px;
   padding-top: 8px;
   width: 100%;
