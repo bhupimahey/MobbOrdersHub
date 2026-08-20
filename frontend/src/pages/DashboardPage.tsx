@@ -146,66 +146,72 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="stats-grid stats-grid-wide">
-        <div className="stat-card">
+      <div className="stats-row-compact">
+        <div className="stat-card compact">
           <div>
             <div className="label">Total Orders</div>
             <div className="value">{stats.total_orders}</div>
             <div className="sub">Sales History today</div>
           </div>
-          <div className="stat-icon blue"><ClipboardList size={18} /></div>
+          <div className="stat-icon blue"><ClipboardList size={15} /></div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card compact">
           <div>
             <div className="label">In Progress</div>
             <div className="value">{stats.in_progress}</div>
             <div className="sub">Active workflow</div>
           </div>
-          <div className="stat-icon orange"><FileWarning size={18} /></div>
+          <div className="stat-icon orange"><FileWarning size={15} /></div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card compact">
           <div>
             <div className="label">Completed Today</div>
             <div className="value">{stats.completed_today}</div>
             <div className="sub">Closed today</div>
           </div>
-          <div className="stat-icon green"><CheckCircle2 size={18} /></div>
+          <div className="stat-icon green"><CheckCircle2 size={15} /></div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card compact">
           <div>
             <div className="label">Today Orders</div>
             <div className="value">{todayOrders}</div>
             <div className="sub">Ordered today</div>
           </div>
-          <div className="stat-icon blue"><Package size={18} /></div>
+          <div className="stat-icon blue"><Package size={15} /></div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card compact">
           <div>
             <div className="label">Customer Pickup</div>
             <div className="value">{conditions.customer_pickup}</div>
             <div className="sub">Pickup at warehouse</div>
           </div>
-          <div className="stat-icon blue"><UserRound size={18} /></div>
+          <div className="stat-icon blue"><UserRound size={15} /></div>
         </div>
-      </div>
 
-      <div className="conditions-strip">
-        <div className="conditions-strip-title">Order Conditions</div>
-        <div className="conditions-strip-items">
-          <div className="condition-chip">
-            <PauseCircle size={14} />
-            <span>On Hold</span>
-            <strong>{conditions.on_hold}</strong>
-          </div>
-          <div className="condition-chip">
-            <PackageX size={14} />
-            <span>Backordered</span>
-            <strong>{conditions.backordered}</strong>
-          </div>
-          <div className="condition-chip">
-            <Ban size={14} />
-            <span>Cancelled</span>
-            <strong>{conditions.cancelled}</strong>
+        <div className="stat-card compact conditions-group">
+          <div className="conditions-group-head">Order Conditions</div>
+          <div className="conditions-group-items">
+            <div className="condition-mini">
+              <span className="stat-icon orange sm"><PauseCircle size={12} /></span>
+              <div>
+                <span className="label">On Hold</span>
+                <strong>{conditions.on_hold}</strong>
+              </div>
+            </div>
+            <div className="condition-mini">
+              <span className="stat-icon orange sm"><PackageX size={12} /></span>
+              <div>
+                <span className="label">Backordered</span>
+                <strong>{conditions.backordered}</strong>
+              </div>
+            </div>
+            <div className="condition-mini">
+              <span className="stat-icon red sm"><Ban size={12} /></span>
+              <div>
+                <span className="label">Cancelled</span>
+                <strong>{conditions.cancelled}</strong>
+              </div>
+            </div>
           </div>
         </div>
       </div>

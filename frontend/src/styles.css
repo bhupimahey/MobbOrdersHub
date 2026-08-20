@@ -323,6 +323,87 @@ h4 {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.stats-row-compact {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(220px, 1.35fr);
+  gap: 10px;
+  align-items: stretch;
+}
+
+.stat-card.compact {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  gap: 8px;
+}
+
+.stat-card.compact .label {
+  font-size: 10px;
+}
+
+.stat-card.compact .value {
+  font-size: 22px;
+  margin-top: 2px;
+}
+
+.stat-card.compact .sub {
+  margin-top: 4px;
+  font-size: 10.5px;
+}
+
+.stat-card.compact .stat-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+}
+
+.stat-icon.sm {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+}
+
+.conditions-group {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+.conditions-group-head {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.conditions-group-items {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.condition-mini {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.condition-mini .label {
+  display: block;
+  font-size: 9.5px;
+  line-height: 1.1;
+}
+
+.condition-mini strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--text);
+}
+
 .conditions-strip {
   display: flex;
   align-items: center;
@@ -3052,6 +3133,12 @@ table.data td:nth-child(9) {
   }
   .stats-grid-wide {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .stats-row-compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .conditions-group {
+    grid-column: 1 / -1;
   }
   .detail-grid {
     grid-template-columns: 1fr 1fr;

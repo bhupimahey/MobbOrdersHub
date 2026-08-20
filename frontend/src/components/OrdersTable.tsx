@@ -2,9 +2,7 @@ import {
   Check,
   ClipboardList,
   Copy,
-  FileCode2,
   FileText,
-  MoreVertical,
   Package,
   Scale,
   ShoppingCart,
@@ -368,14 +366,7 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
   const [rows, setRows] = useState<Order[]>(orders)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
-  const [menuFor, setMenuFor] = useState<string | null>(null)
-  const [jsonOrder, setJsonOrder] = useState<Order | null>(null)
-  const [jsonPayload, setJsonPayload] = useState<unknown>(null)
-  const [jsonLoading, setJsonLoading] = useState(false)
-  const [jsonError, setJsonError] = useState('')
-  const [jsonCopied, setJsonCopied] = useState(false)
   const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
   const loadedDetails = useRef<Set<string>>(new Set())
 
   useEffect(() => {
@@ -383,23 +374,6 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
     loadedDetails.current = new Set()
   }, [orders])
 
-  useEffect(() => {
-    if (!menuFor) return
-    const onDown = (e: MouseEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) {
-        setMenuFor(null)
-      }
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenuFor(null)
-    }
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [menuFor])
 
   const loadOrderDetail = async (order: Order) => {
     if (loadedDetails.current.has(order.id)) return
@@ -434,64 +408,6 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
     }
   }
 
-  const openOrderJson = async (order: Order) => {
-    setMenuFor(null)
-    setJsonOrder(order)
-    setJsonPayload(null)
-    setJsonError('')
-    setJsonLoading(true)
-    setJsonCopied(false)
-    try {
-      const { data } = await api.get(`/orders/${encodeURIComponent(order.id)}/raw`)
-      setJsonPayload(data.data ?? data)
-    } catch {
-      try {
-        const { data } = await api.get(`/orders/${encodeURIComponent(order.order_number)}/raw`)
-        setJsonPayload(data.data ?? data)
-      } catch {
-        setJsonError('Could not load full Spire JSON for this order.')
-      }
-    } finally {
-      setJsonLoading(false)
-    }
-  }
-
-  const copyJson = async () => {
-    if (!jsonPayload) return
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(jsonPayload, null, 2))
-      setJsonCopied(true)
-      setTimeout(() => setJsonCopied(false), 1500)
-    } catch {
-      setJsonError('Could not copy JSON.')
-    }
-  }
-
-  const renderActions = (order: Order, menuOpen: boolean) => (
-    <div
-      className="row-actions"
-      ref={menuOpen ? menuRef : undefined}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <button
-        type="button"
-        className="btn btn-icon btn-ghost actions-btn"
-        onClick={() => setMenuFor(menuOpen ? null : order.id)}
-        aria-label="More actions"
-        aria-expanded={menuOpen}
-      >
-        <MoreVertical size={18} />
-      </button>
-      {menuOpen && (
-        <div className="row-actions-menu">
-          <button type="button" onClick={() => void openOrderJson(order)}>
-            <FileCode2 size={14} />
-            Order JSON
-          </button>
-        </div>
-      )}
-    </div>
-  )
 
   const renderDetails = (order: Order) => (
     <div className="detail-grid">
@@ -583,13 +499,11 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
               <th>Elapsed Time</th>
               <th>Conditions</th>
               <th>Last Updated</th>
-              <th style={{ width: 48 }}></th>
             </tr>
           </thead>
           <tbody>
             {rows.map((order) => {
               const open = expanded === order.id
-              const menuOpen = menuFor === order.id
               return (
                 <Fragment key={order.id}>
                   <tr
@@ -617,11 +531,10 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
                       ))}
                     </td>
                     <td>{formatUpdated(order.last_updated)}</td>
-                    <td className="actions-cell">{renderActions(order, menuOpen)}</td>
                   </tr>
                   {open && (
                     <tr className="expanded-row">
-                      <td colSpan={9}>{renderDetails(order)}</td>
+                      <td colSpan={8}>{renderDetails(order)}</td>
                     </tr>
                   )}
                 </Fragment>
@@ -629,7 +542,7 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={9}>
+                <td colSpan={8}>
                   <div className="empty">No orders found for your assigned phases.</div>
                 </td>
               </tr>
@@ -644,7 +557,6 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
         ) : (
           rows.map((order) => {
             const open = expanded === order.id
-            const menuOpen = menuFor === order.id
             return (
               <article
                 key={`m-${order.id}`}
@@ -672,64 +584,12 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
                     </div>
                   ) : null}
                 </button>
-                <div className="order-card-actions">{renderActions(order, menuOpen)}</div>
                 {open ? <div className="order-card-details">{renderDetails(order)}</div> : null}
               </article>
             )
           })
         )}
       </div>
-
-      {jsonOrder && (
-        <div
-          className="modal-backdrop"
-          onClick={() => setJsonOrder(null)}
-          role="presentation"
-        >
-          <div
-            className="modal modal-json"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="order-json-title"
-          >
-            <div className="modal-json-header">
-              <div>
-                <h2 id="order-json-title">Order JSON</h2>
-                <p>
-                  {jsonOrder.order_number}
-                  {jsonOrder.customer ? ` · ${jsonOrder.customer}` : ''}
-                  {' · full Spire payload'}
-                </p>
-              </div>
-              <div className="modal-json-actions">
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => void copyJson()}
-                  disabled={!jsonPayload || jsonLoading}
-                >
-                  <Copy size={14} />
-                  {jsonCopied ? 'Copied' : 'Copy JSON'}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-icon btn-ghost"
-                  onClick={() => setJsonOrder(null)}
-                  aria-label="Close"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-            {jsonLoading && <div className="empty">Loading Spire JSON…</div>}
-            {jsonError && <div className="form-error">{jsonError}</div>}
-            {!jsonLoading && jsonPayload != null ? (
-              <pre className="order-json-pre">{JSON.stringify(jsonPayload, null, 2)}</pre>
-            ) : null}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
