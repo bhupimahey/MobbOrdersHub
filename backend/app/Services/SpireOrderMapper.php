@@ -13,6 +13,10 @@ class SpireOrderMapper
         'completed',
     ];
 
+    private const SPIRE_TZ = 'UTC';
+
+    private const DISPLAY_TZ = 'America/Toronto';
+
     public function mapList(array $records): array
     {
         return array_map(fn (array $row) => $this->mapOrder($row), $records);
@@ -117,7 +121,7 @@ class SpireOrderMapper
             // Invoiced orders are treated as completed for listings / progress.
             'is_completed' => $phase === 'completed' || $phase === 'invoiced',
             'is_delayed' => false,
-            'completed_today' => ($phase === 'completed' || $phase === 'invoiced') && str_starts_with($modified, date('Y-m-d')),
+            'completed_today' => ($phase === 'completed' || $phase === 'invoiced') && str_starts_with($modified, $this->todayInDisplayTz()),
             'items' => $mappedItems,
             'shipping' => $shipping,
             'financial' => $this->mapFinancial($raw),
@@ -408,8 +412,12 @@ class SpireOrderMapper
             return '—';
         }
         try {
-            $start = new \DateTimeImmutable($from);
-            $diff = (new \DateTimeImmutable)->getTimestamp() - $start->getTimestamp();
+            $start = $this->parseSpireDateTime($from);
+            if (! $start) {
+                return '—';
+            }
+            $now = new \DateTimeImmutable('now', new \DateTimeZone(self::DISPLAY_TZ));
+            $diff = $now->getTimestamp() - $start->getTimestamp();
             if ($diff < 0) {
                 $diff = 0;
             }
@@ -431,28 +439,18 @@ class SpireOrderMapper
     }
 
     /**
-     * Spire orderDate is often date-only (YYYY-MM-DD). Prefer created timestamp for clock time.
+     * Prefer Spire `created` (UTC → Toronto). Date-only orderDate has no clock to convert.
      */
     private function formatOrderDateTime(mixed $orderDate, mixed $created): string
     {
         $orderDate = $orderDate !== null && $orderDate !== '' ? (string) $orderDate : '';
         $created = $created !== null && $created !== '' ? (string) $created : '';
 
-        if ($orderDate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $orderDate) && $created !== '') {
-            try {
-                $createdDt = new \DateTimeImmutable($created);
-
-                return $orderDate.' '.$createdDt->format('H:i');
-            } catch (\Throwable) {
-                return $orderDate;
-            }
+        if ($created !== '') {
+            return $this->formatDateTime($created);
         }
 
-        if ($orderDate !== '') {
-            return $this->formatDateTime($orderDate);
-        }
-
-        return $this->formatDateTime($created);
+        return $this->formatDateTime($orderDate);
     }
 
     private function formatDateTime(mixed $value): string
@@ -461,11 +459,44 @@ class SpireOrderMapper
             return '';
         }
         try {
-            // Spire timestamps are usually office-local without timezone suffix.
-            return (new \DateTimeImmutable((string) $value))->format('Y-m-d H:i');
+            $dt = $this->parseSpireDateTime((string) $value);
+
+            return $dt ? $dt->format('Y-m-d H:i:s') : (string) $value;
         } catch (\Throwable) {
             return (string) $value;
         }
+    }
+
+    /**
+     * Spire timestamps are UTC without a zone suffix. Convert to America/Toronto for display.
+     */
+    private function parseSpireDateTime(string $value): ?\DateTimeImmutable
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+
+        $displayTz = new \DateTimeZone(self::DISPLAY_TZ);
+
+        // Date-only values are calendar dates (no UTC clock) — keep as Toronto midnight.
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            return new \DateTimeImmutable($value.' 00:00:00', $displayTz);
+        }
+
+        // Explicit Z / offset — honor then convert to Toronto.
+        if (preg_match('/(?:Z|[+-]\d{2}:?\d{2})$/i', $value)) {
+            return (new \DateTimeImmutable($value))->setTimezone($displayTz);
+        }
+
+        // Naive Spire datetime → interpret as UTC, display Toronto.
+        return (new \DateTimeImmutable($value, new \DateTimeZone(self::SPIRE_TZ)))
+            ->setTimezone($displayTz);
+    }
+
+    private function todayInDisplayTz(): string
+    {
+        return (new \DateTimeImmutable('now', new \DateTimeZone(self::DISPLAY_TZ)))->format('Y-m-d');
     }
 
 }

@@ -83,7 +83,11 @@ class ErpOrderService
         );
 
         // Invoiced docs leave sales/orders — merge today's invoices so Hub can show Invoiced + Completed.
-        $invoiceResult = $this->spire->listInvoicesForDate(date('Y-m-d'), 100, $fresh);
+        $invoiceResult = $this->spire->listInvoicesForDate(
+            (new \DateTimeImmutable('now', new \DateTimeZone('America/Toronto')))->format('Y-m-d'),
+            100,
+            $fresh
+        );
         $invoiceOrders = [];
         foreach ($invoiceResult['records'] ?? [] as $row) {
             if (! is_array($row)) {

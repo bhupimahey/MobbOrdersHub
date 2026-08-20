@@ -36,14 +36,35 @@ class SpireOrderMapperTest extends TestCase
 
         $this->assertSame('picked_packed', $mapped['current_phase']);
         $this->assertSame(3, $mapped['current_phase_index']);
-        $this->assertSame('2026-07-10 12:10', $mapped['order_date']);
-        $this->assertSame('2026-08-05 16:01', $mapped['last_updated']);
-        $this->assertSame('2026-07-10 00:00', $mapped['shipping']['est_delivery']);
+        // Spire UTC → America/Toronto (EDT, UTC-4 in July/August).
+        $this->assertSame('2026-07-10 08:10:31', $mapped['order_date']);
+        $this->assertSame('2026-08-05 12:01:35', $mapped['last_updated']);
+        $this->assertSame('2026-07-10 00:00:00', $mapped['shipping']['est_delivery']);
         $this->assertCount(1, $mapped['items']);
         $this->assertSame('T9012-BL-XS', $mapped['items'][0]['sku']);
         $this->assertSame(1.0, $mapped['items'][0]['ship_qty']);
         $this->assertSame(0.0, $mapped['items'][0]['bo_qty']);
         $this->assertSame('done', $mapped['items'][0]['status']);
+    }
+
+    public function test_converts_spire_utc_timestamps_to_toronto(): void
+    {
+        $mapper = new SpireOrderMapper;
+        $mapped = $mapper->mapOrder([
+            'id' => 1,
+            'orderNo' => '00167861-0',
+            'status' => 'O',
+            'orderDate' => '2026-08-04',
+            'created' => '2026-08-04T16:06:49.541768',
+            'modified' => '2026-08-04T16:06:49.541768',
+            'createdBy' => 'DZ',
+            'customer' => ['name' => 'Test'],
+        ]);
+
+        // 16:06:49 UTC → 12:06:49 America/Toronto (EDT).
+        $this->assertSame('2026-08-04 12:06:49', $mapped['order_date']);
+        $this->assertSame('2026-08-04 12:06:49', $mapped['last_updated']);
+        $this->assertSame('2026-08-04 12:06:49', $mapped['timeline'][0]['at']);
     }
 
     public function test_maps_financial_fields(): void
