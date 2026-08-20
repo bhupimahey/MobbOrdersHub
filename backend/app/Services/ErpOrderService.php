@@ -360,7 +360,7 @@ class ErpOrderService
         $completedToday = collect($orders)->where('completed_today', true)->count();
         $delayed = $open->where('is_delayed', true)->count();
 
-        // Total Orders card = today's Sales History (invoices) count.
+        // Today's Sales History (invoices) from Spire sales/invoices.
         $salesHistoryToday = (int) ($result['meta']['invoice_count'] ?? 0);
         if ($salesHistoryToday === 0) {
             $salesHistoryToday = $open->filter(function ($o) {
@@ -368,6 +368,15 @@ class ErpOrderService
                     || (($o['spire']['source'] ?? null) === 'invoice');
             })->count();
         }
+
+        // Open workflow orders excluding invoiced (avoid double-counting Sales History).
+        $openWorkflow = $open->filter(function ($o) {
+            return ($o['current_phase'] ?? '') !== 'invoiced'
+                && (($o['spire']['source'] ?? null) !== 'invoice');
+        })->count();
+
+        // Total Orders = open orders counter + today's Sales History invoices.
+        $totalOrders = $openWorkflow + $salesHistoryToday;
 
         $todayYmd = (new \DateTimeImmutable('now', new \DateTimeZone('America/Toronto')))->format('Y-m-d');
         $todayOrders = $open->filter(function ($o) use ($todayYmd) {
@@ -385,11 +394,12 @@ class ErpOrderService
 
         return [
             'stats' => [
-                'total_orders' => $usingMock ? ($salesHistoryToday ?: 128) : $salesHistoryToday,
+                'total_orders' => $usingMock ? ($totalOrders ?: 128) : $totalOrders,
                 'in_progress' => $usingMock ? ($inProgress ?: 42) : $inProgress,
                 'completed_today' => $usingMock ? ($completedToday ?: 96) : $completedToday,
                 'delayed_orders' => $usingMock ? ($delayed ?: 5) : $delayed,
                 'today_orders' => $usingMock ? ($todayOrders ?: 13) : $todayOrders,
+                'sales_history_today' => $usingMock ? ($salesHistoryToday ?: 4) : $salesHistoryToday,
             ],
             'conditions' => [
                 'on_hold' => $usingMock ? ($conditions['on_hold'] ?: 8) : $conditions['on_hold'],

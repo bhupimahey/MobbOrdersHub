@@ -94,6 +94,7 @@ export interface DashboardData {
     completed_today: number
     delayed_orders: number
     today_orders?: number
+    sales_history_today?: number
   }
   conditions: {
     on_hold: number

@@ -324,53 +324,75 @@ h4 {
 }
 
 .stats-row-compact {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(220px, 1.35fr);
-  gap: 10px;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
   align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.stats-row-compact > .stat-card.compact:not(.conditions-group) {
+  flex: 1 1 0;
+  min-width: 108px;
+}
+
+.stats-row-compact > .conditions-group {
+  flex: 1.55 1 260px;
+  min-width: 260px;
+  max-width: 360px;
 }
 
 .stat-card.compact {
-  padding: 10px 12px;
+  padding: 8px 10px;
   border-radius: var(--radius-sm);
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
 }
 
 .stat-card.compact .label {
-  font-size: 10px;
+  font-size: 9.5px;
+  letter-spacing: 0.03em;
 }
 
 .stat-card.compact .value {
-  font-size: 22px;
+  font-size: 20px;
   margin-top: 2px;
 }
 
 .stat-card.compact .sub {
-  margin-top: 4px;
-  font-size: 10.5px;
+  margin-top: 3px;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .stat-card.compact .stat-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
 }
 
 .stat-icon.sm {
-  width: 24px;
-  height: 24px;
-  border-radius: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  flex-shrink: 0;
 }
 
 .conditions-group {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
+  padding: 8px 12px !important;
 }
 
 .conditions-group-head {
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -380,7 +402,7 @@ h4 {
 .conditions-group-items {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  gap: 8px;
 }
 
 .condition-mini {
@@ -392,13 +414,14 @@ h4 {
 
 .condition-mini .label {
   display: block;
-  font-size: 9.5px;
-  line-height: 1.1;
+  font-size: 9px;
+  line-height: 1.15;
+  white-space: nowrap;
 }
 
 .condition-mini strong {
   display: block;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 800;
   line-height: 1.1;
   color: var(--text);
@@ -3135,10 +3158,17 @@ table.data td:nth-child(9) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .stats-row-compact {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    flex-wrap: wrap;
   }
-  .conditions-group {
-    grid-column: 1 / -1;
+  .stats-row-compact > .stat-card.compact:not(.conditions-group) {
+    flex: 1 1 calc(33.333% - 8px);
+    min-width: 140px;
+    max-width: none;
+  }
+  .stats-row-compact > .conditions-group {
+    flex: 1 1 100%;
+    max-width: none;
+    min-width: 0;
   }
   .detail-grid {
     grid-template-columns: 1fr 1fr;

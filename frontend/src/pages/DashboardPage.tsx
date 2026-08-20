@@ -151,7 +151,7 @@ export default function DashboardPage() {
           <div>
             <div className="label">Total Orders</div>
             <div className="value">{stats.total_orders}</div>
-            <div className="sub">Sales History today</div>
+            <div className="sub">Open + Sales History today</div>
           </div>
           <div className="stat-icon blue"><ClipboardList size={15} /></div>
         </div>
