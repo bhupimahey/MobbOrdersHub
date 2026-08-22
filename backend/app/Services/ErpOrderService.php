@@ -348,14 +348,14 @@ class ErpOrderService
         $result = $this->listOrders($user, ['limit' => 200, 'page' => 1, 'fresh' => true]);
         $orders = $result['data'] ?? [];
 
-        // Open workflow — hide Completed only; keep today's Invoiced visible (same as Orders UI).
-        $latestOrders = collect($orders)
-            ->filter(fn ($o) => ($o['current_phase'] ?? '') !== 'completed')
+        $sortedOrders = collect($orders)
             ->sortByDesc(fn ($o) => $o['order_date'] ?? $o['last_updated'] ?? '')
             ->values()
             ->all();
 
-        $open = collect($latestOrders);
+        // Open workflow for counters; full list (incl. Completed) for status filter.
+        $open = collect($sortedOrders)
+            ->filter(fn ($o) => ($o['current_phase'] ?? '') !== 'completed');
         $inProgress = $open->where('is_completed', false)->where('is_delayed', false)->count();
         $completedToday = collect($orders)->where('completed_today', true)->count();
         $delayed = $open->where('is_delayed', true)->count();
@@ -413,7 +413,7 @@ class ErpOrderService
                 'orders_completed' => $usingMock ? ($completedToday ?: 96) : $completedToday,
                 'delayed_orders' => $usingMock ? ($delayed ?: 5) : $delayed,
             ],
-            'orders' => $latestOrders,
+            'orders' => $sortedOrders,
             'using_mock' => $usingMock,
             'error' => $result['meta']['error'] ?? null,
         ];

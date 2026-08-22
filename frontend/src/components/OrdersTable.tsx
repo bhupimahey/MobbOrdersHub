@@ -423,8 +423,6 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
           <div><span>Sales Order #</span><strong>{order.additional.sales_order || '—'}</strong></div>
           <div><span>Customer PO #</span><strong>{order.additional.customer_po || '—'}</strong></div>
           <div><span>Created By</span><strong>{order.additional.created_by || '—'}</strong></div>
-          <div><span>Warehouse</span><strong>{order.additional.warehouse || '—'}</strong></div>
-          <div><span>Carrier</span><strong>{order.shipping?.carrier || '—'}</strong></div>
           <div><span>Service</span><strong>{order.shipping?.service || '—'}</strong></div>
           <div>
             <span>Tracking #</span>
@@ -443,8 +441,6 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
               ) : null}
             </strong>
           </div>
-          <div><span>Weight</span><strong>{order.shipping?.weight || '—'}</strong></div>
-          <div><span>Est. Delivery</span><strong>{order.shipping?.est_delivery || '—'}</strong></div>
         </div>
       </div>
 

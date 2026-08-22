@@ -75,8 +75,8 @@ export default function OrdersPage() {
   }
 
   const filtered = useMemo(() => {
-    // Hide Completed only — today's Invoiced (from sales/invoices) stay visible.
-    let list = allOrders.filter((o) => o.current_phase !== 'completed')
+    // Show all phases including Completed / Invoiced; filters apply on top.
+    let list = [...allOrders]
     if (status !== 'all') {
       list = list.filter((o) => matchesStatusFilter(o, status))
     }
@@ -104,7 +104,7 @@ export default function OrdersPage() {
         <div className="listing-page-title">
           <h1>Orders</h1>
           <p>
-            All orders from the ERP API (excludes Completed; includes today’s Invoiced)
+            All orders from the ERP API (includes Completed & Invoiced)
             {usingMock ? ' · Mock data' : ''}
             {loading && allOrders.length > 0 ? ' · Refreshing…' : ''}
             {!loading ? ` · ${filtered.length} shown` : ''}

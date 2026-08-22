@@ -77,8 +77,10 @@ export default function DashboardPage() {
 
   const orders = useMemo(() => {
     let list: Order[] = data?.orders ?? []
-    list = list.filter((o) => o.current_phase !== 'completed')
-    if (status !== 'all') {
+    // Default view hides Completed; selecting Completed in the dropdown shows them.
+    if (status === 'all') {
+      list = list.filter((o) => o.current_phase !== 'completed')
+    } else {
       list = list.filter((o) => matchesStatusFilter(o, status))
     }
     if (search.trim()) {

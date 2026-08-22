@@ -9,10 +9,10 @@ export const CONDITION_FILTERS = [
   { value: 'cond:Customer Pickup', label: 'Customer Pickup' },
 ] as const
 
-/** Status dropdown: phases (except Completed) + order conditions. */
+/** Status dropdown: all workflow phases + order conditions. */
 export const STATUS_FILTER_OPTIONS = [
   { value: 'all', label: 'All Status' },
-  ...PHASES_META.filter((p) => p.code !== 'completed').map((p) => ({
+  ...PHASES_META.map((p) => ({
     value: p.code,
     label: p.name,
   })),
