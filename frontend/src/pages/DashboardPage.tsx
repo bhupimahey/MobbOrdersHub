@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CheckCircle2,
   ClipboardList,
@@ -17,6 +17,7 @@ import PageLoader from '../components/PageLoader'
 import { DASH_CACHE_KEY } from '../context/AuthContext'
 import { matchesStatusFilter, STATUS_FILTER_OPTIONS } from '../lib/orderStatusFilter'
 import { readPageCache, writePageCache } from '../lib/pageCache'
+import { ORDERS_POLL_MS, usePollingWhenVisible } from '../lib/usePollingWhenVisible'
 import type { DashboardData, Order } from '../types'
 
 function readDashboardCache(): DashboardData | null {
@@ -54,26 +55,25 @@ export default function DashboardPage() {
   const [status, setStatus] = useState('all')
   const [loading, setLoading] = useState(!cached)
 
-  useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      if (!cached) setLoading(true)
-      try {
-        const { data: res } = await api.get<DashboardData>('/dashboard')
-        if (cancelled) return
-        setData(res)
-        writePageCache('dashboard', res)
-        sessionStorage.setItem(DASH_CACHE_KEY, JSON.stringify(res))
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
+  const loadDashboard = useCallback(async () => {
+    setLoading(true)
+    try {
+      const { data: res } = await api.get<DashboardData>('/dashboard')
+      setData(res)
+      writePageCache('dashboard', res)
+      sessionStorage.setItem(DASH_CACHE_KEY, JSON.stringify(res))
+    } finally {
+      setLoading(false)
     }
-    void load()
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    void loadDashboard()
+  }, [loadDashboard])
+
+  usePollingWhenVisible(() => {
+    void loadDashboard()
+  }, ORDERS_POLL_MS)
 
   const orders = useMemo(() => {
     let list: Order[] = data?.orders ?? []
@@ -126,6 +126,7 @@ export default function DashboardPage() {
             {data?.using_mock ? ' · Mock data' : ''}
             {loading && data ? ' · Refreshing…' : ''}
             {!loading ? ` · ${orders.length} shown` : ''}
+            {' · Auto-refresh 30s'}
           </p>
         </div>
         <div className="toolbar">

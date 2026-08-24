@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RefreshCw, Search } from 'lucide-react'
 import api from '../api/client'
 import DateRangeFilter from '../components/DateRangeFilter'
@@ -11,6 +11,7 @@ import {
 } from '../lib/datePresets'
 import { matchesStatusFilter, STATUS_FILTER_OPTIONS } from '../lib/orderStatusFilter'
 import { readPageCache, writePageCache } from '../lib/pageCache'
+import { ORDERS_POLL_MS, usePollingWhenVisible } from '../lib/usePollingWhenVisible'
 import type { Order } from '../types'
 
 const CACHE_KEY = 'orders'
@@ -31,40 +32,42 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(!cached)
   const [usingMock, setUsingMock] = useState(cached?.usingMock ?? false)
   const [error, setError] = useState('')
-  const [reloadKey, setReloadKey] = useState(0)
+  const hasLoadedOnceRef = useRef(Boolean(cached))
+
+  const loadOrders = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent)
+    // Keep existing rows visible; only full-page loader when we have nothing yet.
+    setLoading(true)
+    if (!silent) setError('')
+    try {
+      // fresh=1 bypasses Spire list cache so Hub matches portal quickly after invoice/save.
+      const { data } = await api.get('/orders', { params: { limit: 200, page: 1, fresh: 1 } })
+      const list = data.data ?? []
+      setAllOrders(list)
+      setUsingMock(Boolean(data.meta?.using_mock))
+      hasLoadedOnceRef.current = true
+      writePageCache(CACHE_KEY, {
+        orders: list,
+        usingMock: Boolean(data.meta?.using_mock),
+      })
+      if (data.meta?.error) setError(String(data.meta.error))
+      else setError('')
+    } catch {
+      if (!silent && !hasLoadedOnceRef.current) setAllOrders([])
+      if (!silent) setError('Failed to load orders from the API.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      if (!cached) setLoading(true)
-      setError('')
-      try {
-        // fresh=1 bypasses Spire list cache so Hub matches portal quickly after invoice/save.
-        const { data } = await api.get('/orders', { params: { limit: 200, page: 1, fresh: 1 } })
-        if (cancelled) return
-        const list = data.data ?? []
-        setAllOrders(list)
-        setUsingMock(Boolean(data.meta?.using_mock))
-        writePageCache(CACHE_KEY, {
-          orders: list,
-          usingMock: Boolean(data.meta?.using_mock),
-        })
-        if (data.meta?.error) setError(String(data.meta.error))
-      } catch {
-        if (!cancelled) {
-          if (!cached) setAllOrders([])
-          setError('Failed to load orders from the API.')
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    void load()
-    return () => {
-      cancelled = true
-    }
+    void loadOrders({ silent: Boolean(cached) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reloadKey])
+  }, [loadOrders])
+
+  usePollingWhenVisible(() => {
+    void loadOrders({ silent: true })
+  }, ORDERS_POLL_MS)
 
   const onPeriodChange = (next: DatePeriod) => {
     setPeriod(next)
@@ -109,6 +112,7 @@ export default function OrdersPage() {
             {loading && allOrders.length > 0 ? ' · Refreshing…' : ''}
             {!loading ? ` · ${filtered.length} shown` : ''}
             {` · ${periodLabel}`}
+            {' · Auto-refresh 30s'}
           </p>
         </div>
         <div className="toolbar orders-toolbar">
@@ -155,8 +159,8 @@ export default function OrdersPage() {
           <button
             type="button"
             className="btn btn-ghost"
-            onClick={() => setReloadKey((k) => k + 1)}
-            title="Refresh"
+            onClick={() => void loadOrders({ silent: false })}
+            title="Refresh listing"
           >
             <RefreshCw size={14} />
             Refresh
@@ -171,19 +175,15 @@ export default function OrdersPage() {
       )}
 
       <div className="orders-full">
-        {loading && ordersEmpty(allOrders) ? (
+        {loading && allOrders.length === 0 ? (
           <PageLoader label="Loading orders" />
         ) : (
           <OrdersTable
-            key={`${reloadKey}-${status}-${period}-${dateFrom}-${dateTo}-${filtered[0]?.id ?? 'none'}`}
+            key={`${status}-${period}-${dateFrom}-${dateTo}`}
             orders={filtered}
           />
         )}
       </div>
     </div>
   )
-}
-
-function ordersEmpty(orders: Order[]) {
-  return orders.length === 0
 }
