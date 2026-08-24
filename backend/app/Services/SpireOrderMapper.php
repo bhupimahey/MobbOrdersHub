@@ -37,6 +37,8 @@ class SpireOrderMapper
         $normalized['invoiceNo'] = $invoiceNo;
         $normalized['phaseId'] = 'INVOICED';
         $normalized['status'] = $raw['status'] ?? 'I';
+        // Force sales-history path so resolvePhase always lands on Invoiced (even if Spire status is C).
+        $normalized['_hub_source'] = 'invoice';
         // Prefer original sales order number when Spire provides it.
         if (empty($normalized['orderNo']) && ! empty($raw['salesOrderNo'])) {
             $normalized['orderNo'] = $raw['salesOrderNo'];
@@ -259,17 +261,27 @@ class SpireOrderMapper
         $tracking = trim((string) ($raw['trackingNo'] ?? ''));
         $referenceNo = strtolower(trim((string) ($raw['referenceNo'] ?? '')));
         $fromPhaseId = $this->mapSpirePhaseId((string) ($raw['phaseId'] ?? ''));
+        $fromSalesHistory = ($raw['_hub_source'] ?? null) === 'invoice'
+            || strtoupper(trim((string) ($raw['phaseId'] ?? ''))) === 'INVOICED';
 
-        if (str_contains($status, 'complete') || str_contains($status, 'closed') || $status === 'c') {
-            return 'completed';
-        }
-
-        // Invoiced (phaseId, invoice number, or sales/invoices source) — progress shows Invoiced + Completed.
+        // Invoiced wins over Spire "C"/closed: phaseId INVOICED, invoice #, or sales/invoices (history).
+        // Listing badge is always Invoiced; workflow progress still fills through Completed.
         if (
             $invoiceNo !== ''
             || $fromPhaseId === 'invoiced'
+            || $fromSalesHistory
             || str_contains($status, 'invoice')
             || $status === 'i'
+        ) {
+            return 'invoiced';
+        }
+
+        // Spire completed/closed without invoice markers → treat as Invoiced for Hub listings.
+        if (
+            $fromPhaseId === 'completed'
+            || str_contains($status, 'complete')
+            || str_contains($status, 'closed')
+            || $status === 'c'
         ) {
             return 'invoiced';
         }

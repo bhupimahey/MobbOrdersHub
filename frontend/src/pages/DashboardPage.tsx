@@ -16,6 +16,7 @@ import OrdersTable from '../components/OrdersTable'
 import PageLoader from '../components/PageLoader'
 import { DASH_CACHE_KEY } from '../context/AuthContext'
 import { matchesStatusFilter, STATUS_FILTER_OPTIONS } from '../lib/orderStatusFilter'
+import { matchesOrderSearch } from '../lib/orderSearch'
 import { readPageCache, writePageCache } from '../lib/pageCache'
 import { ORDERS_POLL_MS, usePollingWhenVisible } from '../lib/usePollingWhenVisible'
 import type { DashboardData, Order } from '../types'
@@ -77,19 +78,12 @@ export default function DashboardPage() {
 
   const orders = useMemo(() => {
     let list: Order[] = data?.orders ?? []
-    // Default view hides Completed; selecting Completed in the dropdown shows them.
-    if (status === 'all') {
-      list = list.filter((o) => o.current_phase !== 'completed')
-    } else {
+    // Include Invoiced (sales history / phaseId). Completed is not a filter — treat as Invoiced.
+    if (status !== 'all') {
       list = list.filter((o) => matchesStatusFilter(o, status))
     }
     if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter(
-        (o) =>
-          o.order_number.toLowerCase().includes(q) ||
-          o.customer.toLowerCase().includes(q),
-      )
+      list = list.filter((o) => matchesOrderSearch(o, search))
     }
     return [...list].sort((a, b) =>
       (b.order_date || '').localeCompare(a.order_date || ''),
@@ -113,7 +107,10 @@ export default function DashboardPage() {
   const todayOrders =
     stats.today_orders ??
     (data?.orders ?? []).filter(
-      (o) => o.current_phase !== 'completed' && orderDay(o.order_date) === todayTorontoYmd(),
+      (o) =>
+        o.current_phase !== 'completed' &&
+        o.current_phase !== 'invoiced' &&
+        orderDay(o.order_date) === todayTorontoYmd(),
     ).length
 
   return (
@@ -134,7 +131,7 @@ export default function DashboardPage() {
             <Search size={15} className="search-icon" />
             <input
               className="input"
-              placeholder="Search orders..."
+              placeholder="Search order #, customer, PO, sales order..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />

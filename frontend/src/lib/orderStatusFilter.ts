@@ -9,10 +9,10 @@ export const CONDITION_FILTERS = [
   { value: 'cond:Customer Pickup', label: 'Customer Pickup' },
 ] as const
 
-/** Status dropdown: all workflow phases + order conditions. */
+/** Status dropdown: workflow phases (no Completed) + order conditions. */
 export const STATUS_FILTER_OPTIONS = [
   { value: 'all', label: 'All Status' },
-  ...PHASES_META.map((p) => ({
+  ...PHASES_META.filter((p) => p.code !== 'completed').map((p) => ({
     value: p.code,
     label: p.name,
   })),
@@ -25,6 +25,11 @@ export function matchesStatusFilter(order: Order, status: string): boolean {
   if (status.startsWith('cond:')) {
     const label = status.slice(5)
     return (order.conditions ?? []).includes(label)
+  }
+
+  // Invoiced filter also matches legacy "completed" rows (same terminal state in Hub).
+  if (status === 'invoiced') {
+    return order.current_phase === 'invoiced' || order.current_phase === 'completed'
   }
 
   return order.current_phase === status

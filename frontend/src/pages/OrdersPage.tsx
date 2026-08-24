@@ -10,6 +10,7 @@ import {
   type DatePeriod,
 } from '../lib/datePresets'
 import { matchesStatusFilter, STATUS_FILTER_OPTIONS } from '../lib/orderStatusFilter'
+import { matchesOrderSearch } from '../lib/orderSearch'
 import { readPageCache, writePageCache } from '../lib/pageCache'
 import { ORDERS_POLL_MS, usePollingWhenVisible } from '../lib/usePollingWhenVisible'
 import type { Order } from '../types'
@@ -78,18 +79,13 @@ export default function OrdersPage() {
   }
 
   const filtered = useMemo(() => {
-    // Show all phases including Completed / Invoiced; filters apply on top.
+    // Show all phases including Invoiced (sales history); filters apply on top.
     let list = [...allOrders]
     if (status !== 'all') {
       list = list.filter((o) => matchesStatusFilter(o, status))
     }
     if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter(
-        (o) =>
-          o.order_number.toLowerCase().includes(q) ||
-          o.customer.toLowerCase().includes(q),
-      )
+      list = list.filter((o) => matchesOrderSearch(o, search))
     }
     if (dateFrom) list = list.filter((o) => orderDay(o.order_date) >= dateFrom)
     if (dateTo) list = list.filter((o) => orderDay(o.order_date) <= dateTo)
@@ -107,7 +103,7 @@ export default function OrdersPage() {
         <div className="listing-page-title">
           <h1>Orders</h1>
           <p>
-            All orders from the ERP API (includes Completed & Invoiced)
+            All orders from the ERP API (includes Invoiced / Sales History)
             {usingMock ? ' · Mock data' : ''}
             {loading && allOrders.length > 0 ? ' · Refreshing…' : ''}
             {!loading ? ` · ${filtered.length} shown` : ''}
@@ -120,7 +116,7 @@ export default function OrdersPage() {
             <Search size={15} className="search-icon" />
             <input
               className="input"
-              placeholder="Search orders..."
+              placeholder="Search order #, customer, PO, sales order..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />

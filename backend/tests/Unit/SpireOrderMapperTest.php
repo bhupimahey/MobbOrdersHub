@@ -186,6 +186,39 @@ class SpireOrderMapperTest extends TestCase
         $this->assertContains('Completed', $phases);
     }
 
+    public function test_phase_id_invoiced_wins_over_status_complete(): void
+    {
+        $mapper = new SpireOrderMapper;
+        $mapped = $mapper->mapOrder([
+            'id' => 12,
+            'orderNo' => '00168019-0',
+            'status' => 'C',
+            'phaseId' => 'INVOICED',
+            'orderDate' => '2026-08-24',
+            'created' => '2026-08-24T16:02:43',
+            'modified' => '2026-08-24T16:02:43',
+            'customer' => ['name' => 'Up The Creek'],
+        ]);
+
+        $this->assertSame('invoiced', $mapped['current_phase']);
+        $this->assertTrue($mapped['is_completed']);
+    }
+
+    public function test_spire_complete_status_maps_to_invoiced(): void
+    {
+        $mapper = new SpireOrderMapper;
+        $mapped = $mapper->mapOrder([
+            'id' => 13,
+            'orderNo' => 'C-1',
+            'status' => 'C',
+            'orderDate' => '2026-08-24',
+            'created' => '2026-08-24T12:00:00',
+            'customer' => ['name' => 'Test'],
+        ]);
+
+        $this->assertSame('invoiced', $mapped['current_phase']);
+    }
+
     public function test_map_invoice_from_sales_history(): void
     {
         $mapper = new SpireOrderMapper;
