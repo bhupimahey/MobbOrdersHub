@@ -117,12 +117,17 @@ export default function DashboardPage() {
     <div className="dashboard">
       <div className="page-header">
         <div>
-          <h1>Mobb Medical Orders Dashboard</h1>
+          <div className="listing-title-row">
+            <h1>Mobb Medical Orders Dashboard</h1>
+            <span className="listing-count-badge" title="Records matching current filters">
+              <strong>{orders.length}</strong>
+              <span>records</span>
+            </span>
+          </div>
           <p>
             Open orders + today’s Invoiced (same list as Orders)
             {data?.using_mock ? ' · Mock data' : ''}
             {loading && data ? ' · Refreshing…' : ''}
-            {!loading ? ` · ${orders.length} shown` : ''}
             {' · Auto-refresh 30s'}
           </p>
         </div>

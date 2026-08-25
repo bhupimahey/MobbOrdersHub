@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RefreshCw, Search } from 'lucide-react'
 import api from '../api/client'
 import DateRangeFilter from '../components/DateRangeFilter'
+import ListingPagination from '../components/ListingPagination'
 import OrdersTable from '../components/OrdersTable'
 import PageLoader from '../components/PageLoader'
 import {
@@ -16,6 +17,8 @@ import { ORDERS_POLL_MS, usePollingWhenVisible } from '../lib/usePollingWhenVisi
 import type { Order } from '../types'
 
 const CACHE_KEY = 'orders'
+/** Rows per page on Orders listing (client-side over filtered results). */
+const PAGE_SIZE = 200
 
 export default function OrdersPage() {
   const cached = readPageCache<{ orders: Order[]; usingMock: boolean }>(CACHE_KEY, 15_000)
@@ -26,6 +29,7 @@ export default function OrdersPage() {
   const initialRange = rangeForPeriod('this_month')
   const [dateFrom, setDateFrom] = useState(initialRange.from)
   const [dateTo, setDateTo] = useState(initialRange.to)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(!cached)
   const [usingMock, setUsingMock] = useState(cached?.usingMock ?? false)
   const [error, setError] = useState('')
@@ -74,6 +78,7 @@ export default function OrdersPage() {
 
   const onPeriodChange = (next: DatePeriod) => {
     setPeriod(next)
+    setPage(1)
     if (next === 'custom') return
     const range = rangeForPeriod(next)
     setDateFrom(range.from)
@@ -82,6 +87,7 @@ export default function OrdersPage() {
 
   const onStatusChange = (next: string) => {
     setStatus(next)
+    setPage(1)
     // Invoiced / Sales History spans multiple days — don't leave users on "Today" empty.
     if (next === 'invoiced' && period === 'today') {
       onPeriodChange('this_month')
@@ -104,21 +110,39 @@ export default function OrdersPage() {
     )
   }, [allOrders, search, status, dateFrom, dateTo])
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+
+  useEffect(() => {
+    if (page !== safePage) setPage(safePage)
+  }, [page, safePage])
+
+  const pageOrders = useMemo(() => {
+    const start = (safePage - 1) * PAGE_SIZE
+    return filtered.slice(start, start + PAGE_SIZE)
+  }, [filtered, safePage])
+
   const periodLabel =
-    DATE_PERIOD_OPTIONS.find((o) => o.value === period)?.label ?? 'Today'
+    DATE_PERIOD_OPTIONS.find((o) => o.value === period)?.label ?? 'This month'
 
   return (
     <div className="listing-page">
       <div className="page-header listing-page-header">
         <div className="listing-page-title">
-          <h1>Orders</h1>
+          <div className="listing-title-row">
+            <h1>Orders</h1>
+            <span className="listing-count-badge" title="Records matching current filters">
+              <strong>{filtered.length}</strong>
+              <span>records</span>
+            </span>
+          </div>
           <p>
             All orders from the ERP API (includes Invoiced / Sales History)
             {usingMock ? ' · Mock data' : ''}
             {loading && allOrders.length > 0 ? ' · Refreshing…' : ''}
-            {!loading ? ` · ${filtered.length} shown` : ''}
             {invoiceCount != null && !loading ? ` · ${invoiceCount} from Sales History` : ''}
             {` · ${periodLabel}`}
+            {` · ${PAGE_SIZE}/page`}
             {' · Auto-refresh 30s'}
           </p>
         </div>
@@ -129,7 +153,10 @@ export default function OrdersPage() {
               className="input"
               placeholder="Search order #, customer, PO, sales order..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setPage(1)
+              }}
             />
           </div>
           <select className="select" value={status} onChange={(e) => onStatusChange(e.target.value)}>
@@ -159,6 +186,7 @@ export default function OrdersPage() {
                 onChange={(from, to) => {
                   setDateFrom(from)
                   setDateTo(to)
+                  setPage(1)
                 }}
               />
             ) : null}
@@ -185,10 +213,18 @@ export default function OrdersPage() {
         {loading && allOrders.length === 0 ? (
           <PageLoader label="Loading orders" />
         ) : (
-          <OrdersTable
-            key={`${status}-${period}-${dateFrom}-${dateTo}`}
-            orders={filtered}
-          />
+          <>
+            <OrdersTable
+              key={`${status}-${period}-${dateFrom}-${dateTo}-${safePage}`}
+              orders={pageOrders}
+            />
+            <ListingPagination
+              page={safePage}
+              pageSize={PAGE_SIZE}
+              total={filtered.length}
+              onPageChange={setPage}
+            />
+          </>
         )}
       </div>
     </div>
