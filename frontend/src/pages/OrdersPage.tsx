@@ -25,8 +25,8 @@ export default function OrdersPage() {
   const [allOrders, setAllOrders] = useState<Order[]>(cached?.orders ?? [])
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
-  const [period, setPeriod] = useState<DatePeriod>('this_month')
-  const initialRange = rangeForPeriod('this_month')
+  const [period, setPeriod] = useState<DatePeriod>('today')
+  const initialRange = rangeForPeriod('today')
   const [dateFrom, setDateFrom] = useState(initialRange.from)
   const [dateTo, setDateTo] = useState(initialRange.to)
   const [page, setPage] = useState(1)
@@ -123,7 +123,7 @@ export default function OrdersPage() {
   }, [filtered, safePage])
 
   const periodLabel =
-    DATE_PERIOD_OPTIONS.find((o) => o.value === period)?.label ?? 'This month'
+    DATE_PERIOD_OPTIONS.find((o) => o.value === period)?.label ?? 'Today'
 
   return (
     <div className="listing-page">
