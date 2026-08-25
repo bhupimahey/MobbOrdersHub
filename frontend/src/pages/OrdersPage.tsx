@@ -31,9 +31,7 @@ export default function OrdersPage() {
   const [dateTo, setDateTo] = useState(initialRange.to)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(!cached)
-  const [usingMock, setUsingMock] = useState(cached?.usingMock ?? false)
   const [error, setError] = useState('')
-  const [invoiceCount, setInvoiceCount] = useState<number | null>(null)
   const hasLoadedOnceRef = useRef(Boolean(cached))
 
   const loadOrders = useCallback(async (opts?: { silent?: boolean }) => {
@@ -46,10 +44,6 @@ export default function OrdersPage() {
       const { data } = await api.get('/orders', { params: { limit: 200, page: 1, fresh: 1 } })
       const list = data.data ?? []
       setAllOrders(list)
-      setUsingMock(Boolean(data.meta?.using_mock))
-      setInvoiceCount(
-        typeof data.meta?.invoice_count === 'number' ? data.meta.invoice_count : null,
-      )
       hasLoadedOnceRef.current = true
       writePageCache(CACHE_KEY, {
         orders: list,
@@ -122,9 +116,6 @@ export default function OrdersPage() {
     return filtered.slice(start, start + PAGE_SIZE)
   }, [filtered, safePage])
 
-  const periodLabel =
-    DATE_PERIOD_OPTIONS.find((o) => o.value === period)?.label ?? 'Today'
-
   return (
     <div className="listing-page">
       <div className="page-header listing-page-header">
@@ -136,15 +127,6 @@ export default function OrdersPage() {
               <span>records</span>
             </span>
           </div>
-          <p>
-            All orders from the ERP API (includes Invoiced / Sales History)
-            {usingMock ? ' · Mock data' : ''}
-            {loading && allOrders.length > 0 ? ' · Refreshing…' : ''}
-            {invoiceCount != null && !loading ? ` · ${invoiceCount} from Sales History` : ''}
-            {` · ${periodLabel}`}
-            {` · ${PAGE_SIZE}/page`}
-            {' · Auto-refresh 30s'}
-          </p>
         </div>
         <div className="toolbar orders-toolbar">
           <div className="search-wrap">

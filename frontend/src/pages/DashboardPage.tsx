@@ -134,15 +134,6 @@ export default function DashboardPage() {
               <span>records</span>
             </span>
           </div>
-          <p>
-            Open orders + Sales History (same list as Orders)
-            {data?.using_mock ? ' · Mock data' : ''}
-            {loading && data ? ' · Refreshing…' : ''}
-            {!loading && orders.length !== listingTotal
-              ? ` · ${orders.length} of ${listingTotal} shown`
-              : ''}
-            {' · Auto-refresh 30s'}
-          </p>
         </div>
         <div className="toolbar">
           <div className="search-wrap">
