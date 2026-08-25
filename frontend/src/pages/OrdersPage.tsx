@@ -22,13 +22,14 @@ export default function OrdersPage() {
   const [allOrders, setAllOrders] = useState<Order[]>(cached?.orders ?? [])
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
-  const [period, setPeriod] = useState<DatePeriod>('today')
-  const initialRange = rangeForPeriod('today')
+  const [period, setPeriod] = useState<DatePeriod>('this_month')
+  const initialRange = rangeForPeriod('this_month')
   const [dateFrom, setDateFrom] = useState(initialRange.from)
   const [dateTo, setDateTo] = useState(initialRange.to)
   const [loading, setLoading] = useState(!cached)
   const [usingMock, setUsingMock] = useState(cached?.usingMock ?? false)
   const [error, setError] = useState('')
+  const [invoiceCount, setInvoiceCount] = useState<number | null>(null)
   const hasLoadedOnceRef = useRef(Boolean(cached))
 
   const loadOrders = useCallback(async (opts?: { silent?: boolean }) => {
@@ -42,13 +43,18 @@ export default function OrdersPage() {
       const list = data.data ?? []
       setAllOrders(list)
       setUsingMock(Boolean(data.meta?.using_mock))
+      setInvoiceCount(
+        typeof data.meta?.invoice_count === 'number' ? data.meta.invoice_count : null,
+      )
       hasLoadedOnceRef.current = true
       writePageCache(CACHE_KEY, {
         orders: list,
         usingMock: Boolean(data.meta?.using_mock),
       })
-      if (data.meta?.error) setError(String(data.meta.error))
-      else setError('')
+      const parts: string[] = []
+      if (data.meta?.error) parts.push(String(data.meta.error))
+      if (data.meta?.invoice_error) parts.push(String(data.meta.invoice_error))
+      setError(parts.join(' · '))
     } catch {
       if (!silent && !hasLoadedOnceRef.current) setAllOrders([])
       if (!silent) setError('Failed to load orders from the API.')
@@ -72,6 +78,14 @@ export default function OrdersPage() {
     const range = rangeForPeriod(next)
     setDateFrom(range.from)
     setDateTo(range.to)
+  }
+
+  const onStatusChange = (next: string) => {
+    setStatus(next)
+    // Invoiced / Sales History spans multiple days — don't leave users on "Today" empty.
+    if (next === 'invoiced' && period === 'today') {
+      onPeriodChange('this_month')
+    }
   }
 
   const filtered = useMemo(() => {
@@ -103,6 +117,7 @@ export default function OrdersPage() {
             {usingMock ? ' · Mock data' : ''}
             {loading && allOrders.length > 0 ? ' · Refreshing…' : ''}
             {!loading ? ` · ${filtered.length} shown` : ''}
+            {invoiceCount != null && !loading ? ` · ${invoiceCount} from Sales History` : ''}
             {` · ${periodLabel}`}
             {' · Auto-refresh 30s'}
           </p>
@@ -117,7 +132,7 @@ export default function OrdersPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <select className="select" value={status} onChange={(e) => setStatus(e.target.value)}>
+          <select className="select" value={status} onChange={(e) => onStatusChange(e.target.value)}>
             {STATUS_FILTER_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}

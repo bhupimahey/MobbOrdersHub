@@ -572,97 +572,102 @@ class SpireApiClient
 
     /**
      * Sales History invoices whose Invoice Date falls in [from, to] (America/Toronto calendar days).
-     * Paginates Spire when needed so Hub can match the desktop Sales History list.
+     *
+     * Important: do NOT paginate a year-to-date Spire date filter — many Spire builds return
+     * oldest-first, so the first 500 rows are January and August invoices never appear.
+     * Match the desktop Sales History list: pull newest pages, then keep rows in range.
      */
     public function listInvoicesBetween(string $fromYmd, string $toYmd, int $limit = 200, bool $fresh = false): array
     {
         $fromYmd = substr($fromYmd, 0, 10);
         $toYmd = substr($toYmd, 0, 10);
         $limit = max(1, min(500, $limit));
-        $pageSize = min(100, $limit);
 
-        $result = $this->listSalesInvoices([
-            'start' => 0,
-            'limit' => $pageSize,
-            'filter' => [
-                'invoiceDate' => [
-                    '$gte' => $fromYmd,
-                    '$lte' => $toYmd,
-                ],
-            ],
-        ], $fresh);
+        $error = null;
+        $byId = [];
 
-        $records = is_array($result['records'] ?? null) ? $result['records'] : [];
-        $error = $result['error'] ?? null;
-
-        // Some Spire builds ignore / reject range filters — pull recent pages and filter locally.
-        $needsLocalScan = ! empty($error)
-            || ($records === [])
-            || $this->invoiceRowsOutsideRange($records, $fromYmd, $toYmd);
-
-        if ($needsLocalScan) {
-            $scanError = null;
-            $records = $this->fetchRecentInvoicePages(max($limit, 300), $fresh, $scanError);
-            if ($scanError) {
-                $error = $scanError;
-            } elseif ($records !== []) {
-                // Recovered via local scan — clear prior filter error.
-                $error = null;
+        // 1) Newest Sales History pages (same order users see in Spire).
+        foreach ($this->fetchRecentInvoicePages(max($limit, 500), $fresh, $error) as $row) {
+            if (! is_array($row)) {
+                continue;
             }
-        } else {
-            // Paginate remaining filtered pages until we hit $limit or exhaust Spire count.
-            $total = isset($result['count']) ? (int) $result['count'] : null;
-            $start = count($records);
-            while ($start < $limit && ($total === null || $start < $total)) {
-                $page = $this->listSalesInvoices([
-                    'start' => $start,
-                    'limit' => $pageSize,
-                    'filter' => [
-                        'invoiceDate' => [
-                            '$gte' => $fromYmd,
-                            '$lte' => $toYmd,
-                        ],
-                    ],
+            $id = (string) ($row['id'] ?? $row['invoiceNo'] ?? '');
+            if ($id === '') {
+                $id = 'row:'.md5(json_encode($row));
+            }
+            $byId[$id] = $row;
+        }
+
+        // 2) Exact invoiceDate=Y-m-d for recent days (reliable on Spire; covers “today” + backlog).
+        try {
+            $to = new \DateTimeImmutable($toYmd);
+            $stopDay = max($fromYmd, $to->modify('-21 days')->format('Y-m-d'));
+            $cursor = new \DateTimeImmutable($toYmd);
+            while ($cursor->format('Y-m-d') >= $stopDay) {
+                $day = $cursor->format('Y-m-d');
+                $dayResult = $this->listSalesInvoices([
+                    'start' => 0,
+                    'limit' => 100,
+                    'filter' => ['invoiceDate' => $day],
                 ], $fresh);
-                if (! empty($page['error'])) {
-                    $error = $page['error'];
-                    break;
+                if (! empty($dayResult['error']) && $error === null) {
+                    $error = $dayResult['error'];
                 }
-                $chunk = is_array($page['records'] ?? null) ? $page['records'] : [];
-                if ($chunk === []) {
-                    break;
+                foreach ($dayResult['records'] ?? [] as $row) {
+                    if (! is_array($row)) {
+                        continue;
+                    }
+                    $id = (string) ($row['id'] ?? $row['invoiceNo'] ?? '');
+                    if ($id === '') {
+                        $id = 'row:'.md5(json_encode($row));
+                    }
+                    $byId[$id] = $row;
                 }
-                array_push($records, ...$chunk);
-                $start += count($chunk);
-                if (count($chunk) < $pageSize) {
-                    break;
-                }
+                $cursor = $cursor->modify('-1 day');
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Spire invoice day scan failed', ['message' => $e->getMessage()]);
+        }
+
+        if ($byId !== [] && $error !== null) {
+            $error = null;
+        }
+
+        $filtered = [];
+        foreach ($byId as $row) {
+            $day = $this->invoiceRowDateYmd($row);
+            if ($day === null) {
+                // Keep undated Sales History rows — still Invoiced in Hub.
+                $filtered[] = $row;
+                continue;
+            }
+            if ($day >= $fromYmd && $day <= $toYmd) {
+                $filtered[] = $row;
             }
         }
 
-        $filtered = array_values(array_filter($records, function ($row) use ($fromYmd, $toYmd) {
-            if (! is_array($row)) {
-                return false;
-            }
-            $day = $this->spireDateToTorontoYmd($row['invoiceDate'] ?? null);
-            if ($day === null) {
-                // Last resort: accept row if any related date lands in range (legacy Spire payloads).
-                foreach (['orderDate', 'modified', 'created'] as $field) {
-                    $alt = $this->spireDateToTorontoYmd($row[$field] ?? null);
-                    if ($alt !== null && $alt >= $fromYmd && $alt <= $toYmd) {
-                        return true;
-                    }
-                }
-
-                return false;
+        // Newest invoice date / invoice no first.
+        usort($filtered, function ($a, $b) {
+            $da = $this->invoiceRowDateYmd($a) ?? '';
+            $db = $this->invoiceRowDateYmd($b) ?? '';
+            if ($da !== $db) {
+                return $db <=> $da;
             }
 
-            return $day >= $fromYmd && $day <= $toYmd;
-        }));
+            return strcmp((string) ($b['invoiceNo'] ?? ''), (string) ($a['invoiceNo'] ?? ''));
+        });
 
         if (count($filtered) > $limit) {
             $filtered = array_slice($filtered, 0, $limit);
         }
+
+        Log::info('Spire sales history invoice merge window', [
+            'from' => $fromYmd,
+            'to' => $toYmd,
+            'raw' => count($byId),
+            'kept' => count($filtered),
+            'error' => $error,
+        ]);
 
         return [
             'records' => $filtered,
@@ -674,21 +679,24 @@ class SpireApiClient
     }
 
     /**
-     * @param  array<int, mixed>  $records
+     * @param  array<string, mixed>  $row
      */
-    private function invoiceRowsOutsideRange(array $records, string $fromYmd, string $toYmd): bool
+    private function invoiceRowDateYmd(array $row): ?string
     {
-        foreach ($records as $row) {
-            if (! is_array($row)) {
-                continue;
+        foreach (['invoiceDate', 'InvoiceDate', 'date', 'invoice_date'] as $field) {
+            $day = $this->spireDateToTorontoYmd($row[$field] ?? null);
+            if ($day !== null) {
+                return $day;
             }
-            $day = $this->spireDateToTorontoYmd($row['invoiceDate'] ?? null);
-            if ($day !== null && ($day < $fromYmd || $day > $toYmd)) {
-                return true;
+        }
+        foreach (['orderDate', 'modified', 'created'] as $field) {
+            $day = $this->spireDateToTorontoYmd($row[$field] ?? null);
+            if ($day !== null) {
+                return $day;
             }
         }
 
-        return false;
+        return null;
     }
 
     /**
@@ -745,6 +753,10 @@ class SpireApiClient
             // Midnight without zone = calendar Invoice Date (do not UTC-shift to previous day).
             if (preg_match('/^(\d{4}-\d{2}-\d{2})[T ]00:00:00(?:\.0+)?$/', $value, $m)) {
                 return $m[1];
+            }
+            // Spire desktop-style dates: 8/24/2026 or 08/24/2026
+            if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})/', $value, $m)) {
+                return sprintf('%04d-%02d-%02d', (int) $m[3], (int) $m[1], (int) $m[2]);
             }
             if (preg_match('/(?:Z|[+-]\d{2}:?\d{2})$/i', $value)) {
                 return (new \DateTimeImmutable($value))->setTimezone($displayTz)->format('Y-m-d');
