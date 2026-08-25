@@ -10,16 +10,12 @@ import {
   type DatePeriod,
 } from '../lib/datePresets'
 import { matchesStatusFilter, STATUS_FILTER_OPTIONS } from '../lib/orderStatusFilter'
-import { matchesOrderSearch } from '../lib/orderSearch'
+import { matchesOrderSearch, listingDay } from '../lib/orderSearch'
 import { readPageCache, writePageCache } from '../lib/pageCache'
 import { ORDERS_POLL_MS, usePollingWhenVisible } from '../lib/usePollingWhenVisible'
 import type { Order } from '../types'
 
 const CACHE_KEY = 'orders'
-
-function orderDay(value: string): string {
-  return value.slice(0, 10)
-}
 
 export default function OrdersPage() {
   const cached = readPageCache<{ orders: Order[]; usingMock: boolean }>(CACHE_KEY, 15_000)
@@ -87,10 +83,10 @@ export default function OrdersPage() {
     if (search.trim()) {
       list = list.filter((o) => matchesOrderSearch(o, search))
     }
-    if (dateFrom) list = list.filter((o) => orderDay(o.order_date) >= dateFrom)
-    if (dateTo) list = list.filter((o) => orderDay(o.order_date) <= dateTo)
+    if (dateFrom) list = list.filter((o) => listingDay(o) >= dateFrom)
+    if (dateTo) list = list.filter((o) => listingDay(o) <= dateTo)
     return [...list].sort((a, b) =>
-      (b.order_date || '').localeCompare(a.order_date || ''),
+      (listingDay(b) + (b.order_date || '')).localeCompare(listingDay(a) + (a.order_date || '')),
     )
   }, [allOrders, search, status, dateFrom, dateTo])
 

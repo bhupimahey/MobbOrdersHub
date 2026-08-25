@@ -43,14 +43,22 @@ class SpireOrderMapper
         if (empty($normalized['orderNo']) && ! empty($raw['salesOrderNo'])) {
             $normalized['orderNo'] = $raw['salesOrderNo'];
         }
-        if (empty($normalized['orderDate']) && ! empty($raw['invoiceDate'])) {
-            $normalized['orderDate'] = $raw['invoiceDate'];
-        }
-        if (empty($normalized['modified']) && ! empty($raw['invoiceDate'])) {
-            $normalized['modified'] = $raw['invoiceDate'];
+
+        $invoiceDate = $raw['invoiceDate'] ?? null;
+        $originalOrderDate = $raw['orderDate'] ?? $raw['salesOrderDate'] ?? null;
+        // Listing date must follow Sales History Invoice Date (not original order date),
+        // otherwise "Today" / period filters hide invoiced rows Spire still shows.
+        if (! empty($invoiceDate)) {
+            $normalized['orderDate'] = $invoiceDate;
+            $normalized['created'] = $invoiceDate;
+            $normalized['modified'] = $invoiceDate;
+        } elseif (empty($normalized['modified']) && ! empty($originalOrderDate)) {
+            $normalized['modified'] = $originalOrderDate;
         }
 
         $mapped = $this->mapOrder($normalized, $items !== [] ? $items : ($raw['items'] ?? []));
+        $mapped['invoice_date'] = $this->formatDateTime($invoiceDate);
+        $mapped['original_order_date'] = $this->formatDateTime($originalOrderDate);
         $mapped['spire'] = array_merge($mapped['spire'] ?? [], [
             'source' => 'invoice',
             'invoice_id' => $raw['id'] ?? null,
@@ -148,6 +156,7 @@ class SpireOrderMapper
                 'invoice_no' => $raw['invoiceNo'] ?? null,
                 'batch_no' => $raw['batchNo'] ?? null,
             ],
+            'invoice_date' => $this->formatDateTime($raw['invoiceDate'] ?? null),
         ];
     }
 

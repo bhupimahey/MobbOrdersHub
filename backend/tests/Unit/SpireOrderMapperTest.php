@@ -247,6 +247,10 @@ class SpireOrderMapperTest extends TestCase
         $this->assertSame('invoice', $mapped['spire']['source']);
         $this->assertSame('00009999', $mapped['spire']['invoice_no']);
         $this->assertSame('E0007736-0', $mapped['order_number']);
+        // Listing date follows Invoice Date (Sales History), not original order date.
+        $this->assertStringStartsWith(date('Y-m-d'), $mapped['order_date']);
+        $this->assertStringStartsWith(date('Y-m-d'), $mapped['invoice_date']);
+        $this->assertStringStartsWith('2026-07-10', $mapped['original_order_date']);
         $this->assertContains('Completed', array_column($mapped['timeline'], 'phase'));
     }
 

@@ -38,6 +38,9 @@ export interface Order {
   order_number: string
   customer: string
   order_date: string
+  /** Invoice date (Sales History) when present — used for invoiced listing filters. */
+  invoice_date?: string
+  original_order_date?: string
   current_phase: string
   current_phase_index: number
   phase_states: string[]
@@ -84,6 +87,14 @@ export interface Order {
     notes: string
     terms?: string
     salesperson?: string
+  }
+  spire?: {
+    status?: string | null
+    phase_id?: string | null
+    invoice_no?: string | null
+    batch_no?: string | null
+    source?: string | null
+    invoice_id?: string | number | null
   }
 }
 

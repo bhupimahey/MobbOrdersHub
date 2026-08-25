@@ -567,40 +567,194 @@ class SpireApiClient
      */
     public function listInvoicesForDate(string $dateYmd, int $limit = 100, bool $fresh = false): array
     {
-        $dateYmd = substr($dateYmd, 0, 10);
+        return $this->listInvoicesBetween($dateYmd, $dateYmd, $limit, $fresh);
+    }
+
+    /**
+     * Sales History invoices whose Invoice Date falls in [from, to] (America/Toronto calendar days).
+     * Paginates Spire when needed so Hub can match the desktop Sales History list.
+     */
+    public function listInvoicesBetween(string $fromYmd, string $toYmd, int $limit = 200, bool $fresh = false): array
+    {
+        $fromYmd = substr($fromYmd, 0, 10);
+        $toYmd = substr($toYmd, 0, 10);
+        $limit = max(1, min(500, $limit));
+        $pageSize = min(100, $limit);
+
         $result = $this->listSalesInvoices([
             'start' => 0,
-            'limit' => $limit,
-            'filter' => ['invoiceDate' => $dateYmd],
+            'limit' => $pageSize,
+            'filter' => [
+                'invoiceDate' => [
+                    '$gte' => $fromYmd,
+                    '$lte' => $toYmd,
+                ],
+            ],
         ], $fresh);
 
-        $records = $result['records'] ?? [];
-        if ($records === [] && empty($result['error'])) {
-            // Some Spire builds ignore filter — pull recent and filter locally.
-            $result = $this->listSalesInvoices([
-                'start' => 0,
-                'limit' => $limit,
-            ], $fresh);
-            $records = $result['records'] ?? [];
+        $records = is_array($result['records'] ?? null) ? $result['records'] : [];
+        $error = $result['error'] ?? null;
+
+        // Some Spire builds ignore / reject range filters — pull recent pages and filter locally.
+        $needsLocalScan = ! empty($error)
+            || ($records === [])
+            || $this->invoiceRowsOutsideRange($records, $fromYmd, $toYmd);
+
+        if ($needsLocalScan) {
+            $scanError = null;
+            $records = $this->fetchRecentInvoicePages(max($limit, 300), $fresh, $scanError);
+            if ($scanError) {
+                $error = $scanError;
+            } elseif ($records !== []) {
+                // Recovered via local scan — clear prior filter error.
+                $error = null;
+            }
+        } else {
+            // Paginate remaining filtered pages until we hit $limit or exhaust Spire count.
+            $total = isset($result['count']) ? (int) $result['count'] : null;
+            $start = count($records);
+            while ($start < $limit && ($total === null || $start < $total)) {
+                $page = $this->listSalesInvoices([
+                    'start' => $start,
+                    'limit' => $pageSize,
+                    'filter' => [
+                        'invoiceDate' => [
+                            '$gte' => $fromYmd,
+                            '$lte' => $toYmd,
+                        ],
+                    ],
+                ], $fresh);
+                if (! empty($page['error'])) {
+                    $error = $page['error'];
+                    break;
+                }
+                $chunk = is_array($page['records'] ?? null) ? $page['records'] : [];
+                if ($chunk === []) {
+                    break;
+                }
+                array_push($records, ...$chunk);
+                $start += count($chunk);
+                if (count($chunk) < $pageSize) {
+                    break;
+                }
+            }
         }
 
-        $filtered = array_values(array_filter($records, function ($row) use ($dateYmd) {
+        $filtered = array_values(array_filter($records, function ($row) use ($fromYmd, $toYmd) {
             if (! is_array($row)) {
                 return false;
             }
-            foreach (['invoiceDate', 'orderDate', 'modified', 'created'] as $field) {
-                $value = substr((string) ($row[$field] ?? ''), 0, 10);
-                if ($value === $dateYmd) {
-                    return true;
+            $day = $this->spireDateToTorontoYmd($row['invoiceDate'] ?? null);
+            if ($day === null) {
+                // Last resort: accept row if any related date lands in range (legacy Spire payloads).
+                foreach (['orderDate', 'modified', 'created'] as $field) {
+                    $alt = $this->spireDateToTorontoYmd($row[$field] ?? null);
+                    if ($alt !== null && $alt >= $fromYmd && $alt <= $toYmd) {
+                        return true;
+                    }
                 }
+
+                return false;
             }
 
-            return false;
+            return $day >= $fromYmd && $day <= $toYmd;
         }));
 
-        $result['records'] = $filtered;
+        if (count($filtered) > $limit) {
+            $filtered = array_slice($filtered, 0, $limit);
+        }
 
-        return $result;
+        return [
+            'records' => $filtered,
+            'count' => count($filtered),
+            'error' => $error,
+            'from' => $fromYmd,
+            'to' => $toYmd,
+        ];
+    }
+
+    /**
+     * @param  array<int, mixed>  $records
+     */
+    private function invoiceRowsOutsideRange(array $records, string $fromYmd, string $toYmd): bool
+    {
+        foreach ($records as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $day = $this->spireDateToTorontoYmd($row['invoiceDate'] ?? null);
+            if ($day !== null && ($day < $fromYmd || $day > $toYmd)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function fetchRecentInvoicePages(int $limit, bool $fresh, ?string &$error): array
+    {
+        $pageSize = 100;
+        $records = [];
+        $start = 0;
+        $maxPages = (int) ceil($limit / $pageSize) + 1;
+
+        for ($page = 0; $page < $maxPages && count($records) < $limit; $page++) {
+            $result = $this->listSalesInvoices([
+                'start' => $start,
+                'limit' => $pageSize,
+            ], $fresh);
+            if (! empty($result['error'])) {
+                $error = $result['error'];
+                break;
+            }
+            $chunk = is_array($result['records'] ?? null) ? $result['records'] : [];
+            if ($chunk === []) {
+                break;
+            }
+            array_push($records, ...$chunk);
+            $start += count($chunk);
+            if (count($chunk) < $pageSize) {
+                break;
+            }
+        }
+
+        return $records;
+    }
+
+    /**
+     * Convert Spire invoice/order timestamps to America/Toronto calendar Y-m-d.
+     */
+    private function spireDateToTorontoYmd(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        $value = trim((string) $value);
+        if ($value === '') {
+            return null;
+        }
+
+        try {
+            $displayTz = new \DateTimeZone('America/Toronto');
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+                return $value;
+            }
+            if (preg_match('/(?:Z|[+-]\d{2}:?\d{2})$/i', $value)) {
+                return (new \DateTimeImmutable($value))->setTimezone($displayTz)->format('Y-m-d');
+            }
+
+            // Naive Spire datetime → UTC, then Toronto calendar day.
+            return (new \DateTimeImmutable($value, new \DateTimeZone('UTC')))
+                ->setTimezone($displayTz)
+                ->format('Y-m-d');
+        } catch (\Throwable) {
+            $day = substr($value, 0, 10);
+
+            return preg_match('/^\d{4}-\d{2}-\d{2}$/', $day) ? $day : null;
+        }
     }
 
     public function getSalesInvoice(string|int $invoiceId): ?array

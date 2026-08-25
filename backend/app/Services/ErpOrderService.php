@@ -82,12 +82,15 @@ class ErpOrderService
             $records
         );
 
-        // Invoiced docs leave sales/orders — merge today's invoices so Hub can show Invoiced + Completed.
-        $invoiceResult = $this->spire->listInvoicesForDate(
-            (new \DateTimeImmutable('now', new \DateTimeZone('America/Toronto')))->format('Y-m-d'),
-            100,
-            $fresh
-        );
+        // Invoiced docs leave sales/orders — merge Sales History so Hub matches Spire Invoices list.
+        // Cover Orders presets (This year / Last 6 months) by Invoice Date, not only "today".
+        $tz = new \DateTimeZone('America/Toronto');
+        $today = new \DateTimeImmutable('now', $tz);
+        $sixMonthsAgo = $today->modify('-6 months')->format('Y-m-d');
+        $yearStart = $today->format('Y').'-01-01';
+        $invoiceFrom = min($sixMonthsAgo, $yearStart);
+        $invoiceTo = $today->format('Y-m-d');
+        $invoiceResult = $this->spire->listInvoicesBetween($invoiceFrom, $invoiceTo, 500, $fresh);
         $invoiceOrders = [];
         foreach ($invoiceResult['records'] ?? [] as $row) {
             if (! is_array($row)) {
@@ -100,14 +103,24 @@ class ErpOrderService
 
         $filtered = $this->filterForUser($orders, $user, $filters);
         $spireCount = $result['count'] ?? null;
+        $todayYmd = $today->format('Y-m-d');
+        $invoicesToday = collect($invoiceOrders)->filter(function ($o) use ($todayYmd) {
+            $day = substr((string) ($o['invoice_date'] ?? $o['order_date'] ?? ''), 0, 10);
+
+            return $day === $todayYmd;
+        })->count();
 
         $filtered['meta'] = array_merge($filtered['meta'] ?? [], [
             'page' => $page,
             'per_page' => $limit,
             'spire_count' => $spireCount,
             'invoice_count' => count($invoiceOrders),
+            'invoice_count_today' => $invoicesToday,
+            'invoice_from' => $invoiceFrom,
+            'invoice_to' => $invoiceTo,
             'start' => $start,
             'fresh' => $fresh,
+            'invoice_error' => $invoiceResult['error'] ?? null,
         ]);
 
         return $filtered;
@@ -361,11 +374,18 @@ class ErpOrderService
         $delayed = $open->where('is_delayed', true)->count();
 
         // Today's Sales History (invoices) from Spire sales/invoices.
-        $salesHistoryToday = (int) ($result['meta']['invoice_count'] ?? 0);
+        $salesHistoryToday = (int) ($result['meta']['invoice_count_today'] ?? 0);
         if ($salesHistoryToday === 0) {
-            $salesHistoryToday = $open->filter(function ($o) {
-                return ($o['current_phase'] ?? '') === 'invoiced'
+            $todayYmd = (new \DateTimeImmutable('now', new \DateTimeZone('America/Toronto')))->format('Y-m-d');
+            $salesHistoryToday = collect($orders)->filter(function ($o) use ($todayYmd) {
+                $isInvoice = ($o['current_phase'] ?? '') === 'invoiced'
                     || (($o['spire']['source'] ?? null) === 'invoice');
+                if (! $isInvoice) {
+                    return false;
+                }
+                $day = substr((string) ($o['invoice_date'] ?? $o['order_date'] ?? ''), 0, 10);
+
+                return $day === $todayYmd;
             })->count();
         }
 
