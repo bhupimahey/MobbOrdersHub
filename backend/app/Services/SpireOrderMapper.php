@@ -516,6 +516,12 @@ class SpireOrderMapper
             return new \DateTimeImmutable($value.' 00:00:00', $displayTz);
         }
 
+        // Midnight with no zone is a Spire calendar date (Invoice Date), not a UTC instant.
+        // Treating 2026-08-25T00:00:00 as UTC would shift to the previous Toronto day.
+        if (preg_match('/^(\d{4}-\d{2}-\d{2})[T ]00:00:00(?:\.0+)?$/', $value, $m)) {
+            return new \DateTimeImmutable($m[1].' 00:00:00', $displayTz);
+        }
+
         // Explicit Z / offset — honor then convert to Toronto.
         if (preg_match('/(?:Z|[+-]\d{2}:?\d{2})$/i', $value)) {
             return (new \DateTimeImmutable($value))->setTimezone($displayTz);

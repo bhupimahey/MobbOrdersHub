@@ -1,5 +1,6 @@
 import type { Order } from '../types'
 import { PHASES_META } from '../types'
+import { isInvoicedOrder } from './orderSearch'
 
 /** Condition labels stored on each order (any phase). */
 export const CONDITION_FILTERS = [
@@ -27,9 +28,9 @@ export function matchesStatusFilter(order: Order, status: string): boolean {
     return (order.conditions ?? []).includes(label)
   }
 
-  // Invoiced filter also matches legacy "completed" rows (same terminal state in Hub).
+  // Invoiced = phase Invoiced OR Sales History row (even if phase markers are incomplete).
   if (status === 'invoiced') {
-    return order.current_phase === 'invoiced' || order.current_phase === 'completed'
+    return isInvoicedOrder(order)
   }
 
   return order.current_phase === status

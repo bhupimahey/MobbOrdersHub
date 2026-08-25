@@ -524,7 +524,7 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
             {rows.length === 0 && (
               <tr>
                 <td colSpan={8}>
-                  <div className="empty">No orders found for your assigned phases.</div>
+                  <div className="empty">No orders match the current filters.</div>
                 </td>
               </tr>
             )}
@@ -534,7 +534,7 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
 
       <div className="orders-mobile">
         {rows.length === 0 ? (
-          <div className="empty">No orders found for your assigned phases.</div>
+          <div className="empty">No orders match the current filters.</div>
         ) : (
           rows.map((order) => {
             const open = expanded === order.id

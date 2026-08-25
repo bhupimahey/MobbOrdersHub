@@ -254,6 +254,23 @@ class SpireOrderMapperTest extends TestCase
         $this->assertContains('Completed', array_column($mapped['timeline'], 'phase'));
     }
 
+    public function test_invoice_midnight_keeps_calendar_day(): void
+    {
+        $mapper = new SpireOrderMapper;
+        $mapped = $mapper->mapInvoice([
+            'id' => 9002,
+            'invoiceNo' => '0000228107',
+            'orderNo' => 'E0007951-0',
+            'invoiceDate' => '2026-08-25T00:00:00',
+            'orderDate' => '2026-08-20',
+            'customer' => ['name' => 'GC APPAREL INC'],
+        ]);
+
+        $this->assertSame('invoiced', $mapped['current_phase']);
+        $this->assertStringStartsWith('2026-08-25', $mapped['order_date']);
+        $this->assertStringStartsWith('2026-08-25', $mapped['invoice_date']);
+    }
+
     public function test_ship_date_maps_to_shipping_preparation_not_shipped(): void
     {
         $mapper = new SpireOrderMapper;

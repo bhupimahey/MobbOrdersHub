@@ -1,10 +1,19 @@
 import type { Order } from '../types'
 
+/** True when order is Invoiced or comes from Spire Sales History. */
+export function isInvoicedOrder(order: Order): boolean {
+  if (order.current_phase === 'invoiced' || order.current_phase === 'completed') return true
+  if (order.spire?.source === 'invoice') return true
+  if ((order.invoice_date || '').trim()) return true
+  if ((order.spire?.invoice_no || '').trim()) return true
+  return false
+}
+
 /** Calendar day used for period filters — Invoice Date for Sales History rows. */
 export function listingDay(order: Order): string {
   const invoice = (order.invoice_date || '').slice(0, 10)
   if (invoice) return invoice
-  if (order.spire?.source === 'invoice' || order.current_phase === 'invoiced') {
+  if (isInvoicedOrder(order)) {
     return (order.order_date || '').slice(0, 10)
   }
   return (order.order_date || '').slice(0, 10)

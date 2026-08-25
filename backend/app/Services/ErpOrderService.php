@@ -446,6 +446,11 @@ class ErpOrderService
         if ($user && $user->isStaff()) {
             $codes = $user->assignedPhaseCodes();
             $collection = $collection->filter(function ($order) use ($codes) {
+                // Sales History / Invoiced always visible — not gated by staff phase assignment.
+                if ($this->isInvoicedListingOrder($order)) {
+                    return true;
+                }
+
                 return in_array($order['current_phase'] ?? '', $codes, true);
             })->values();
         }
@@ -499,6 +504,20 @@ class ErpOrderService
             'data' => $collection->all(),
             'meta' => ['count' => $collection->count(), 'using_mock' => $this->useMock()],
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $order
+     */
+    private function isInvoicedListingOrder(array $order): bool
+    {
+        $phase = (string) ($order['current_phase'] ?? '');
+
+        return $phase === 'invoiced'
+            || $phase === 'completed'
+            || (($order['spire']['source'] ?? null) === 'invoice')
+            || trim((string) ($order['invoice_date'] ?? '')) !== ''
+            || trim((string) ($order['spire']['invoice_no'] ?? '')) !== '';
     }
 
     private function useMock(): bool

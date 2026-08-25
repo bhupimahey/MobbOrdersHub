@@ -742,6 +742,10 @@ class SpireApiClient
             if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
                 return $value;
             }
+            // Midnight without zone = calendar Invoice Date (do not UTC-shift to previous day).
+            if (preg_match('/^(\d{4}-\d{2}-\d{2})[T ]00:00:00(?:\.0+)?$/', $value, $m)) {
+                return $m[1];
+            }
             if (preg_match('/(?:Z|[+-]\d{2}:?\d{2})$/i', $value)) {
                 return (new \DateTimeImmutable($value))->setTimezone($displayTz)->format('Y-m-d');
             }
