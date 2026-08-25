@@ -82,10 +82,6 @@ export default function OrdersPage() {
   const onStatusChange = (next: string) => {
     setStatus(next)
     setPage(1)
-    // Invoiced / Sales History spans multiple days — don't leave users on "Today" empty.
-    if (next === 'invoiced' && period === 'today') {
-      onPeriodChange('this_month')
-    }
   }
 
   const filtered = useMemo(() => {
