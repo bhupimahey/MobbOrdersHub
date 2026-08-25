@@ -366,48 +366,60 @@ class ErpOrderService
             ->values()
             ->all();
 
-        // Open workflow for counters; full list (incl. Completed) for status filter.
-        $open = collect($sortedOrders)
-            ->filter(fn ($o) => ($o['current_phase'] ?? '') !== 'completed');
-        $inProgress = $open->where('is_completed', false)->where('is_delayed', false)->count();
-        $completedToday = collect($orders)->where('completed_today', true)->count();
-        $delayed = $open->where('is_delayed', true)->count();
-
-        // Today's Sales History (invoices) from Spire sales/invoices.
-        $salesHistoryToday = (int) ($result['meta']['invoice_count_today'] ?? 0);
-        if ($salesHistoryToday === 0) {
-            $todayYmd = (new \DateTimeImmutable('now', new \DateTimeZone('America/Toronto')))->format('Y-m-d');
-            $salesHistoryToday = collect($orders)->filter(function ($o) use ($todayYmd) {
-                $isInvoice = ($o['current_phase'] ?? '') === 'invoiced'
-                    || (($o['spire']['source'] ?? null) === 'invoice');
-                if (! $isInvoice) {
-                    return false;
-                }
-                $day = substr((string) ($o['invoice_date'] ?? $o['order_date'] ?? ''), 0, 10);
-
-                return $day === $todayYmd;
-            })->count();
-        }
-
-        // Open workflow orders excluding invoiced (avoid double-counting Sales History).
-        $openWorkflow = $open->filter(function ($o) {
-            return ($o['current_phase'] ?? '') !== 'invoiced'
-                && (($o['spire']['source'] ?? null) !== 'invoice');
-        })->count();
-
-        // Total Orders = open orders counter + today's Sales History invoices.
-        $totalOrders = $openWorkflow + $salesHistoryToday;
-
+        $all = collect($sortedOrders);
         $todayYmd = (new \DateTimeImmutable('now', new \DateTimeZone('America/Toronto')))->format('Y-m-d');
-        $todayOrders = $open->filter(function ($o) use ($todayYmd) {
-            return str_starts_with((string) ($o['order_date'] ?? ''), $todayYmd);
+
+        $isInvoiced = function (array $o): bool {
+            return ($o['current_phase'] ?? '') === 'invoiced'
+                || ($o['current_phase'] ?? '') === 'completed'
+                || (($o['spire']['source'] ?? null) === 'invoice');
+        };
+
+        $listingDay = function (array $o) use ($isInvoiced): string {
+            if ($isInvoiced($o)) {
+                return substr((string) ($o['invoice_date'] ?? $o['order_date'] ?? ''), 0, 10);
+            }
+
+            return substr((string) ($o['order_date'] ?? ''), 0, 10);
+        };
+
+        // Open workflow = still in Hub phases (not Sales History / Invoiced).
+        $openWorkflow = $all->filter(fn ($o) => ! $isInvoiced($o));
+        $invoiced = $all->filter(fn ($o) => $isInvoiced($o));
+
+        // Total Orders must match the listing row count (open + all Sales History in window).
+        $totalOrders = $all->count();
+
+        $inProgress = $openWorkflow
+            ->where('is_completed', false)
+            ->where('is_delayed', false)
+            ->count();
+
+        $completedToday = $all->filter(function ($o) use ($todayYmd, $isInvoiced, $listingDay) {
+            if (! empty($o['completed_today'])) {
+                return true;
+            }
+
+            return $isInvoiced($o) && $listingDay($o) === $todayYmd;
         })->count();
 
+        $delayed = $openWorkflow->where('is_delayed', true)->count();
+
+        $salesHistoryToday = $invoiced->filter(
+            fn ($o) => $listingDay($o) === $todayYmd
+        )->count();
+
+        // Ordered today (open workflow by order date).
+        $todayOrders = $openWorkflow->filter(
+            fn ($o) => str_starts_with((string) ($o['order_date'] ?? ''), $todayYmd)
+        )->count();
+
+        // Conditions across the full listing (open + invoiced), matching what users see in the table.
         $conditions = [
-            'on_hold' => $open->filter(fn ($o) => in_array('On Hold', $o['conditions'] ?? [], true))->count(),
-            'backordered' => $open->filter(fn ($o) => in_array('Backordered', $o['conditions'] ?? [], true))->count(),
-            'cancelled' => $open->filter(fn ($o) => in_array('Cancelled', $o['conditions'] ?? [], true))->count(),
-            'customer_pickup' => $open->filter(fn ($o) => in_array('Customer Pickup', $o['conditions'] ?? [], true))->count(),
+            'on_hold' => $all->filter(fn ($o) => in_array('On Hold', $o['conditions'] ?? [], true))->count(),
+            'backordered' => $all->filter(fn ($o) => in_array('Backordered', $o['conditions'] ?? [], true))->count(),
+            'cancelled' => $all->filter(fn ($o) => in_array('Cancelled', $o['conditions'] ?? [], true))->count(),
+            'customer_pickup' => $all->filter(fn ($o) => in_array('Customer Pickup', $o['conditions'] ?? [], true))->count(),
         ];
 
         $usingMock = $this->useMock();
@@ -420,6 +432,8 @@ class ErpOrderService
                 'delayed_orders' => $usingMock ? ($delayed ?: 5) : $delayed,
                 'today_orders' => $usingMock ? ($todayOrders ?: 13) : $todayOrders,
                 'sales_history_today' => $usingMock ? ($salesHistoryToday ?: 4) : $salesHistoryToday,
+                'sales_history_total' => $usingMock ? ($invoiced->count() ?: 4) : $invoiced->count(),
+                'open_workflow' => $usingMock ? ($openWorkflow->count() ?: 100) : $openWorkflow->count(),
             ],
             'conditions' => [
                 'on_hold' => $usingMock ? ($conditions['on_hold'] ?: 8) : $conditions['on_hold'],

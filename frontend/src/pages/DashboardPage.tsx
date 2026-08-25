@@ -104,6 +104,11 @@ export default function DashboardPage() {
     customer_pickup: 0,
   }
 
+  // Prefer live listing length so Total Orders always matches the table when unfiltered.
+  const listingTotal = data?.orders?.length ?? stats.total_orders
+  const openWorkflow = stats.open_workflow
+  const salesHistoryTotal = stats.sales_history_total
+
   const todayOrders =
     stats.today_orders ??
     (data?.orders ?? []).filter(
@@ -112,6 +117,11 @@ export default function DashboardPage() {
         o.current_phase !== 'invoiced' &&
         orderDay(o.order_date) === todayTorontoYmd(),
     ).length
+
+  const totalSub =
+    openWorkflow != null && salesHistoryTotal != null
+      ? `${openWorkflow} open + ${salesHistoryTotal} Sales History`
+      : 'Open + Sales History in list'
 
   return (
     <div className="dashboard">
@@ -125,9 +135,12 @@ export default function DashboardPage() {
             </span>
           </div>
           <p>
-            Open orders + today’s Invoiced (same list as Orders)
+            Open orders + Sales History (same list as Orders)
             {data?.using_mock ? ' · Mock data' : ''}
             {loading && data ? ' · Refreshing…' : ''}
+            {!loading && orders.length !== listingTotal
+              ? ` · ${orders.length} of ${listingTotal} shown`
+              : ''}
             {' · Auto-refresh 30s'}
           </p>
         </div>
@@ -155,8 +168,8 @@ export default function DashboardPage() {
         <div className="stat-card compact">
           <div>
             <div className="label">Total Orders</div>
-            <div className="value">{stats.total_orders}</div>
-            <div className="sub">Open + Sales History today</div>
+            <div className="value">{listingTotal}</div>
+            <div className="sub">{totalSub}</div>
           </div>
           <div className="stat-icon blue"><ClipboardList size={15} /></div>
         </div>
@@ -172,7 +185,7 @@ export default function DashboardPage() {
           <div>
             <div className="label">Completed Today</div>
             <div className="value">{stats.completed_today}</div>
-            <div className="sub">Closed today</div>
+            <div className="sub">Invoiced / closed today</div>
           </div>
           <div className="stat-icon green"><CheckCircle2 size={15} /></div>
         </div>

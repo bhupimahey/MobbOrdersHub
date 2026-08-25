@@ -106,6 +106,8 @@ export interface DashboardData {
     delayed_orders: number
     today_orders?: number
     sales_history_today?: number
+    sales_history_total?: number
+    open_workflow?: number
   }
   conditions: {
     on_hold: number
