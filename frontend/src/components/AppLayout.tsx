@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { prefetchRoute } from '../lib/pageCache'
+import BackToTop from './BackToTop'
 
 const LOGO = '/mobb-logo.png'
 
@@ -123,6 +124,7 @@ export default function AppLayout() {
       <main className="main">
         <Outlet />
       </main>
+      <BackToTop />
     </div>
   )
 }
