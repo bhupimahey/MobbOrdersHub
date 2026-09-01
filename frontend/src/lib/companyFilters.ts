@@ -62,7 +62,13 @@ export function writeDashboardFilters(company: CompanySlug, filters: DashboardFi
   writeJson(`dashboard:${company}`, filters)
 }
 
-const ORDER_PERIODS: DatePeriod[] = ['today', 'yesterday', 'this_week', 'this_month', 'custom']
+const ORDER_PERIODS: DatePeriod[] = [
+  'today',
+  'this_month',
+  'last_6_months',
+  'this_year',
+  'custom',
+]
 
 export function readOrdersFilters(company: CompanySlug): OrdersFilters {
   const saved = readJson<Partial<OrdersFilters>>(`orders:${company}`)
