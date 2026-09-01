@@ -21,7 +21,12 @@ import {
   dashCacheKey,
   pageCacheKey,
   resolveCompanySlug,
+  type CompanySlug,
 } from '../lib/companies'
+import {
+  readDashboardFilters,
+  writeDashboardFilters,
+} from '../lib/companyFilters'
 import { matchesStatusFilter, STATUS_FILTER_OPTIONS } from '../lib/orderStatusFilter'
 import { matchesOrderSearch } from '../lib/orderSearch'
 import { readPageCache, writePageCache } from '../lib/pageCache'
@@ -59,21 +64,21 @@ function todayTorontoYmd(): string {
 export default function DashboardPage() {
   const { company: companyParam } = useParams()
   const company = resolveCompanySlug(companyParam)
+  return <DashboardPageBody key={company} company={company} />
+}
+
+function DashboardPageBody({ company }: { company: CompanySlug }) {
   const cfg = companyConfig(company)
   const cached = readDashboardCache(company)
+  const initialFilters = readDashboardFilters(company)
   const [data, setData] = useState<DashboardData | null>(cached)
-  const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('all')
+  const [search, setSearch] = useState(initialFilters.search)
+  const [status, setStatus] = useState(initialFilters.status)
   const [loading, setLoading] = useState(!cached)
 
-  // Reset listing state when switching company so MOBB/HHC never mix.
   useEffect(() => {
-    const next = readDashboardCache(company)
-    setData(next)
-    setSearch('')
-    setStatus('all')
-    setLoading(!next)
-  }, [company])
+    writeDashboardFilters(company, { search, status })
+  }, [company, search, status])
 
   const loadDashboard = useCallback(async () => {
     setLoading(true)

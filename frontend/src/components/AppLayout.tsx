@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useNavigate, useParams } from 'react-router-dom'
+import { useEffect } from 'react'
 import {
   Activity,
   ClipboardList,
@@ -9,7 +10,7 @@ import {
   Users,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { DEFAULT_COMPANY, resolveCompanySlug } from '../lib/companies'
+import { lastRememberedCompany, rememberCompany, resolveCompanySlug } from '../lib/companies'
 import { prefetchRoute } from '../lib/pageCache'
 import BackToTop from './BackToTop'
 
@@ -28,10 +29,16 @@ export default function AppLayout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const { company: companyParam } = useParams()
-  const company = resolveCompanySlug(companyParam ?? DEFAULT_COMPANY)
+  const company = companyParam
+    ? resolveCompanySlug(companyParam)
+    : lastRememberedCompany()
   const isAdmin = user?.is_super_admin
   const dashboardPath = `/dashboard/${company}`
   const ordersPath = `/orders/${company}`
+
+  useEffect(() => {
+    if (companyParam) rememberCompany(resolveCompanySlug(companyParam))
+  }, [companyParam])
 
   const handleLogout = () => {
     logout()

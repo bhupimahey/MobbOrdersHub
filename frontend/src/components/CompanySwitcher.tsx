@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   COMPANIES,
+  rememberCompany,
   resolveCompanySlug,
   type CompanySlug,
 } from '../lib/companies'
@@ -18,6 +19,7 @@ export default function CompanySwitcher({ basePath, disabled = false }: Props) {
 
   const select = (slug: CompanySlug) => {
     if (disabled || slug === selected) return
+    rememberCompany(slug)
     navigate(`${basePath}/${slug}`)
   }
 

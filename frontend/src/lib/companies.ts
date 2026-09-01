@@ -43,3 +43,22 @@ export function dashCacheKey(slug: CompanySlug): string {
 export function pageCacheKey(base: string, slug: CompanySlug): string {
   return `${base}:${slug}`
 }
+
+const LAST_COMPANY_KEY = 'san_last_company'
+
+/** Remember last company so sidebar links keep MOBB/HHC when leaving listing pages. */
+export function rememberCompany(slug: CompanySlug): void {
+  try {
+    sessionStorage.setItem(LAST_COMPANY_KEY, slug)
+  } catch {
+    // ignore
+  }
+}
+
+export function lastRememberedCompany(): CompanySlug {
+  try {
+    return resolveCompanySlug(sessionStorage.getItem(LAST_COMPANY_KEY))
+  } catch {
+    return DEFAULT_COMPANY
+  }
+}

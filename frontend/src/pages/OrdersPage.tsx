@@ -12,7 +12,11 @@ import {
   rangeForPeriod,
   type DatePeriod,
 } from '../lib/datePresets'
-import { pageCacheKey, resolveCompanySlug } from '../lib/companies'
+import { pageCacheKey, resolveCompanySlug, type CompanySlug } from '../lib/companies'
+import {
+  readOrdersFilters,
+  writeOrdersFilters,
+} from '../lib/companyFilters'
 import { matchesStatusFilter, STATUS_FILTER_OPTIONS } from '../lib/orderStatusFilter'
 import { matchesOrderSearch, listingDay } from '../lib/orderSearch'
 import { readPageCache, writePageCache } from '../lib/pageCache'
@@ -25,35 +29,28 @@ const PAGE_SIZE = 200
 export default function OrdersPage() {
   const { company: companyParam } = useParams()
   const company = resolveCompanySlug(companyParam)
+  // Remount per company so filters initialize from that company's saved selection.
+  return <OrdersPageBody key={company} company={company} />
+}
+
+function OrdersPageBody({ company }: { company: CompanySlug }) {
   const cacheKey = pageCacheKey('orders', company)
   const cached = readPageCache<{ orders: Order[]; usingMock: boolean }>(cacheKey, 15_000)
+  const initialFilters = readOrdersFilters(company)
   const [allOrders, setAllOrders] = useState<Order[]>(cached?.orders ?? [])
-  const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('all')
-  const [period, setPeriod] = useState<DatePeriod>('today')
-  const initialRange = rangeForPeriod('today')
-  const [dateFrom, setDateFrom] = useState(initialRange.from)
-  const [dateTo, setDateTo] = useState(initialRange.to)
+  const [search, setSearch] = useState(initialFilters.search)
+  const [status, setStatus] = useState(initialFilters.status)
+  const [period, setPeriod] = useState<DatePeriod>(initialFilters.period)
+  const [dateFrom, setDateFrom] = useState(initialFilters.dateFrom)
+  const [dateTo, setDateTo] = useState(initialFilters.dateTo)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(!cached)
   const [error, setError] = useState('')
   const hasLoadedOnceRef = useRef(Boolean(cached))
 
-  // Reset when company changes so MOBB / HHC never mix in the UI.
   useEffect(() => {
-    const next = readPageCache<{ orders: Order[]; usingMock: boolean }>(cacheKey, 15_000)
-    setAllOrders(next?.orders ?? [])
-    setSearch('')
-    setStatus('all')
-    setPeriod('today')
-    const range = rangeForPeriod('today')
-    setDateFrom(range.from)
-    setDateTo(range.to)
-    setPage(1)
-    setError('')
-    hasLoadedOnceRef.current = Boolean(next)
-    setLoading(!next)
-  }, [company, cacheKey])
+    writeOrdersFilters(company, { search, status, period, dateFrom, dateTo })
+  }, [company, search, status, period, dateFrom, dateTo])
 
   const loadOrders = useCallback(async (opts?: { silent?: boolean }) => {
     const silent = Boolean(opts?.silent)
