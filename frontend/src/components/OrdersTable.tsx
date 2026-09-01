@@ -362,7 +362,13 @@ function todayISO(): string {
 
 export { todayISO }
 
-export default function OrdersTable({ orders }: { orders: Order[] }) {
+export default function OrdersTable({
+  orders,
+  company,
+}: {
+  orders: Order[]
+  company?: string
+}) {
   const [rows, setRows] = useState<Order[]>(orders)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -379,7 +385,9 @@ export default function OrdersTable({ orders }: { orders: Order[] }) {
     if (loadedDetails.current.has(order.id)) return
     setDetailLoadingId(order.id)
     try {
-      const { data } = await api.get(`/orders/${encodeURIComponent(order.id)}`)
+      const { data } = await api.get(`/orders/${encodeURIComponent(order.id)}`, {
+        params: company ? { company } : undefined,
+      })
       const full = data.data as Order | undefined
       if (full) {
         loadedDetails.current.add(order.id)

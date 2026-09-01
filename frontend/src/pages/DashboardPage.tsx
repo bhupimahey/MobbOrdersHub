@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useParams } from 'react-router-dom'
 import {
   CheckCircle2,
   ClipboardList,
@@ -11,21 +12,27 @@ import {
   Search,
 } from 'lucide-react'
 import api from '../api/client'
+import CompanySwitcher from '../components/CompanySwitcher'
 import WorkflowStepper from '../components/WorkflowStepper'
 import OrdersTable from '../components/OrdersTable'
 import PageLoader from '../components/PageLoader'
-import { DASH_CACHE_KEY } from '../context/AuthContext'
+import {
+  companyConfig,
+  dashCacheKey,
+  pageCacheKey,
+  resolveCompanySlug,
+} from '../lib/companies'
 import { matchesStatusFilter, STATUS_FILTER_OPTIONS } from '../lib/orderStatusFilter'
 import { matchesOrderSearch } from '../lib/orderSearch'
 import { readPageCache, writePageCache } from '../lib/pageCache'
 import { ORDERS_POLL_MS, usePollingWhenVisible } from '../lib/usePollingWhenVisible'
 import type { DashboardData, Order } from '../types'
 
-function readDashboardCache(): DashboardData | null {
-  const fromPage = readPageCache<DashboardData>('dashboard', 15_000)
+function readDashboardCache(slug: string): DashboardData | null {
+  const fromPage = readPageCache<DashboardData>(pageCacheKey('dashboard', resolveCompanySlug(slug)), 15_000)
   if (fromPage) return fromPage
   try {
-    const raw = sessionStorage.getItem(DASH_CACHE_KEY)
+    const raw = sessionStorage.getItem(dashCacheKey(resolveCompanySlug(slug)))
     return raw ? (JSON.parse(raw) as DashboardData) : null
   } catch {
     return null
@@ -50,23 +57,37 @@ function todayTorontoYmd(): string {
 }
 
 export default function DashboardPage() {
-  const cached = readDashboardCache()
+  const { company: companyParam } = useParams()
+  const company = resolveCompanySlug(companyParam)
+  const cfg = companyConfig(company)
+  const cached = readDashboardCache(company)
   const [data, setData] = useState<DashboardData | null>(cached)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
   const [loading, setLoading] = useState(!cached)
 
+  // Reset listing state when switching company so MOBB/HHC never mix.
+  useEffect(() => {
+    const next = readDashboardCache(company)
+    setData(next)
+    setSearch('')
+    setStatus('all')
+    setLoading(!next)
+  }, [company])
+
   const loadDashboard = useCallback(async () => {
     setLoading(true)
     try {
-      const { data: res } = await api.get<DashboardData>('/dashboard')
+      const { data: res } = await api.get<DashboardData>('/dashboard', {
+        params: { company },
+      })
       setData(res)
-      writePageCache('dashboard', res)
-      sessionStorage.setItem(DASH_CACHE_KEY, JSON.stringify(res))
+      writePageCache(pageCacheKey('dashboard', company), res)
+      sessionStorage.setItem(dashCacheKey(company), JSON.stringify(res))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [company])
 
   useEffect(() => {
     void loadDashboard()
@@ -78,7 +99,6 @@ export default function DashboardPage() {
 
   const orders = useMemo(() => {
     let list: Order[] = data?.orders ?? []
-    // Include Invoiced (sales history / phaseId). Completed is not a filter — treat as Invoiced.
     if (status !== 'all') {
       list = list.filter((o) => matchesStatusFilter(o, status))
     }
@@ -104,7 +124,6 @@ export default function DashboardPage() {
     customer_pickup: 0,
   }
 
-  // Prefer live listing length so Total Orders always matches the table when unfiltered.
   const listingTotal = data?.orders?.length ?? stats.total_orders
   const openWorkflow = stats.open_workflow
   const salesHistoryTotal = stats.sales_history_total
@@ -125,10 +144,12 @@ export default function DashboardPage() {
 
   return (
     <div className="dashboard">
+      <CompanySwitcher basePath="/dashboard" disabled={loading} />
+
       <div className="page-header">
         <div>
           <div className="listing-title-row">
-            <h1>Mobb Medical Orders Dashboard</h1>
+            <h1>{cfg.dashboardTitle}</h1>
             <span className="listing-count-badge" title="Records matching current filters">
               <strong>{orders.length}</strong>
               <span>records</span>
@@ -232,7 +253,7 @@ export default function DashboardPage() {
             {loading && !data ? (
               <PageLoader label="Loading orders" />
             ) : (
-              <OrdersTable orders={orders} />
+              <OrdersTable orders={orders} company={company} />
             )}
           </div>
         </div>

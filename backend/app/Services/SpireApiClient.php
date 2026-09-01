@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Log;
 
 class SpireApiClient
 {
+    private ?string $companyOverride = null;
+
     public function configured(): bool
     {
         return $this->baseUrl() !== ''
@@ -24,8 +26,21 @@ class SpireApiClient
         return rtrim((string) Setting::getValue('spire_base_url', ''), '/');
     }
 
+    /**
+     * Request-scoped Spire company (e.g. MOB_MED2 / HHC2). Clears when null.
+     */
+    public function useCompany(?string $companyId): void
+    {
+        $companyId = $companyId !== null ? trim($companyId) : null;
+        $this->companyOverride = $companyId !== '' ? $companyId : null;
+    }
+
     public function company(): string
     {
+        if ($this->companyOverride !== null && $this->companyOverride !== '') {
+            return $this->companyOverride;
+        }
+
         return trim((string) Setting::getValue('spire_company', ''));
     }
 

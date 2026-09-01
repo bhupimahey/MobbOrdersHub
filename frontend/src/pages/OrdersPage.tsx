@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useParams } from 'react-router-dom'
 import { RefreshCw, Search } from 'lucide-react'
 import api from '../api/client'
+import CompanySwitcher from '../components/CompanySwitcher'
 import DateRangeFilter from '../components/DateRangeFilter'
 import ListingPagination from '../components/ListingPagination'
 import OrdersTable from '../components/OrdersTable'
@@ -10,18 +12,21 @@ import {
   rangeForPeriod,
   type DatePeriod,
 } from '../lib/datePresets'
+import { pageCacheKey, resolveCompanySlug } from '../lib/companies'
 import { matchesStatusFilter, STATUS_FILTER_OPTIONS } from '../lib/orderStatusFilter'
 import { matchesOrderSearch, listingDay } from '../lib/orderSearch'
 import { readPageCache, writePageCache } from '../lib/pageCache'
 import { ORDERS_POLL_MS, usePollingWhenVisible } from '../lib/usePollingWhenVisible'
 import type { Order } from '../types'
 
-const CACHE_KEY = 'orders'
 /** Rows per page on Orders listing (client-side over filtered results). */
 const PAGE_SIZE = 200
 
 export default function OrdersPage() {
-  const cached = readPageCache<{ orders: Order[]; usingMock: boolean }>(CACHE_KEY, 15_000)
+  const { company: companyParam } = useParams()
+  const company = resolveCompanySlug(companyParam)
+  const cacheKey = pageCacheKey('orders', company)
+  const cached = readPageCache<{ orders: Order[]; usingMock: boolean }>(cacheKey, 15_000)
   const [allOrders, setAllOrders] = useState<Order[]>(cached?.orders ?? [])
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
@@ -34,18 +39,34 @@ export default function OrdersPage() {
   const [error, setError] = useState('')
   const hasLoadedOnceRef = useRef(Boolean(cached))
 
+  // Reset when company changes so MOBB / HHC never mix in the UI.
+  useEffect(() => {
+    const next = readPageCache<{ orders: Order[]; usingMock: boolean }>(cacheKey, 15_000)
+    setAllOrders(next?.orders ?? [])
+    setSearch('')
+    setStatus('all')
+    setPeriod('today')
+    const range = rangeForPeriod('today')
+    setDateFrom(range.from)
+    setDateTo(range.to)
+    setPage(1)
+    setError('')
+    hasLoadedOnceRef.current = Boolean(next)
+    setLoading(!next)
+  }, [company, cacheKey])
+
   const loadOrders = useCallback(async (opts?: { silent?: boolean }) => {
     const silent = Boolean(opts?.silent)
-    // Keep existing rows visible; only full-page loader when we have nothing yet.
     setLoading(true)
     if (!silent) setError('')
     try {
-      // fresh=1 bypasses Spire list cache so Hub matches portal quickly after invoice/save.
-      const { data } = await api.get('/orders', { params: { limit: 200, page: 1, fresh: 1 } })
+      const { data } = await api.get('/orders', {
+        params: { limit: 200, page: 1, fresh: 1, company },
+      })
       const list = data.data ?? []
       setAllOrders(list)
       hasLoadedOnceRef.current = true
-      writePageCache(CACHE_KEY, {
+      writePageCache(cacheKey, {
         orders: list,
         usingMock: Boolean(data.meta?.using_mock),
       })
@@ -59,11 +80,10 @@ export default function OrdersPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [company, cacheKey])
 
   useEffect(() => {
-    void loadOrders({ silent: Boolean(cached) })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void loadOrders({ silent: hasLoadedOnceRef.current })
   }, [loadOrders])
 
   usePollingWhenVisible(() => {
@@ -85,7 +105,6 @@ export default function OrdersPage() {
   }
 
   const filtered = useMemo(() => {
-    // Show all phases including Invoiced (sales history); filters apply on top.
     let list = [...allOrders]
     if (status !== 'all') {
       list = list.filter((o) => matchesStatusFilter(o, status))
@@ -114,6 +133,8 @@ export default function OrdersPage() {
 
   return (
     <div className="listing-page">
+      <CompanySwitcher basePath="/orders" disabled={loading} />
+
       <div className="page-header listing-page-header">
         <div className="listing-page-title">
           <div className="listing-title-row">
@@ -193,8 +214,9 @@ export default function OrdersPage() {
         ) : (
           <>
             <OrdersTable
-              key={`${status}-${period}-${dateFrom}-${dateTo}-${safePage}`}
+              key={`${company}-${status}-${period}-${dateFrom}-${dateTo}-${safePage}`}
               orders={pageOrders}
+              company={company}
             />
             <ListingPagination
               page={safePage}

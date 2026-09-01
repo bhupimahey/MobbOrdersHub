@@ -9,6 +9,7 @@ import {
 } from 'react'
 import api from '../api/client'
 import { clearPageCaches, prefetchRoute } from '../lib/pageCache'
+import { DEFAULT_COMPANY, dashCacheKey } from '../lib/companies'
 import type { AuthUser } from '../types'
 
 interface AuthContextValue {
@@ -22,7 +23,7 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
-const DASH_CACHE_KEY = 'san_dashboard_cache'
+const DASH_CACHE_KEY = dashCacheKey(DEFAULT_COMPANY)
 const ME_AT_KEY = 'san_me_at'
 const ME_TTL_MS = 5 * 60 * 1000
 
@@ -44,10 +45,10 @@ function warmAppChunks(isAdmin: boolean) {
     prefetchRoute(() => import('../pages/ActivityPage'))
     prefetchRoute(() => import('../pages/SettingsPage'))
   }
-  // Warm dashboard API in background
-  void api.get('/dashboard').then((res) => {
+  // Warm dashboard API in background (default company)
+  void api.get('/dashboard', { params: { company: DEFAULT_COMPANY } }).then((res) => {
     try {
-      sessionStorage.setItem(DASH_CACHE_KEY, JSON.stringify(res.data))
+      sessionStorage.setItem(dashCacheKey(DEFAULT_COMPANY), JSON.stringify(res.data))
     } catch {
       // ignore
     }

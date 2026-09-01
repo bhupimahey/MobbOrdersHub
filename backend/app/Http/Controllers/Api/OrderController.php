@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\ErpOrderService;
+use App\Support\SpireCompany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -17,15 +18,16 @@ class OrderController extends Controller
         if ($request->boolean('fresh')) {
             $filters['fresh'] = true;
         }
+        $filters['company'] = $this->companyFromRequest($request);
 
         return response()->json(
             $this->orders->listOrders($request->user(), $filters)
         );
     }
 
-    public function show(string $orderId): JsonResponse
+    public function show(Request $request, string $orderId): JsonResponse
     {
-        $order = $this->orders->getOrder($orderId);
+        $order = $this->orders->getOrder($orderId, $this->companyFromRequest($request));
 
         if (! $order) {
             return response()->json(['message' => 'Order not found.'], 404);
@@ -92,7 +94,12 @@ class OrderController extends Controller
     public function dashboard(Request $request): JsonResponse
     {
         return response()->json(
-            $this->orders->dashboardSummary($request->user())
+            $this->orders->dashboardSummary($request->user(), $this->companyFromRequest($request))
         );
+    }
+
+    private function companyFromRequest(Request $request): string
+    {
+        return (string) $request->query('company', SpireCompany::DEFAULT_SLUG);
     }
 }

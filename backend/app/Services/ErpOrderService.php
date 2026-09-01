@@ -6,6 +6,7 @@ use App\Models\ActivityLog;
 use App\Models\OrderPhase;
 use App\Models\Setting;
 use App\Models\User;
+use App\Support\SpireCompany;
 use Illuminate\Support\Facades\Log;
 
 class ErpOrderService
@@ -15,7 +16,32 @@ class ErpOrderService
         private readonly SpireOrderMapper $mapper,
     ) {}
 
+    /**
+     * Scope subsequent Spire calls to a Hub company slug or Spire ID for this request.
+     */
+    public function usingCompany(?string $slugOrId): void
+    {
+        if ($slugOrId === null || trim($slugOrId) === '') {
+            $this->spire->useCompany(null);
+
+            return;
+        }
+
+        $this->spire->useCompany(SpireCompany::resolveId($slugOrId));
+    }
+
     public function listOrders(?User $user = null, array $filters = []): array
+    {
+        $this->usingCompany($filters['company'] ?? null);
+
+        try {
+            return $this->listOrdersInternal($user, $filters);
+        } finally {
+            $this->usingCompany(null);
+        }
+    }
+
+    private function listOrdersInternal(?User $user, array $filters): array
     {
         $fresh = ! empty($filters['fresh']);
 
@@ -27,6 +53,7 @@ class ErpOrderService
             $filtered['meta'] = array_merge($filtered['meta'] ?? [], [
                 'page' => $page,
                 'per_page' => $limit,
+                'spire_company' => $this->spire->company(),
             ]);
 
             return $filtered;
@@ -39,6 +66,7 @@ class ErpOrderService
                     'count' => 0,
                     'using_mock' => false,
                     'error' => 'Spire API is not configured. Add credentials in Settings.',
+                    'spire_company' => $this->spire->company(),
                 ],
             ];
         }
@@ -71,6 +99,7 @@ class ErpOrderService
                     'per_page' => $limit,
                     'using_mock' => false,
                     'error' => $result['error'],
+                    'spire_company' => $this->spire->company(),
                 ],
             ];
         }
@@ -121,6 +150,7 @@ class ErpOrderService
             'start' => $start,
             'fresh' => $fresh,
             'invoice_error' => $invoiceResult['error'] ?? null,
+            'spire_company' => $this->spire->company(),
         ]);
 
         return $filtered;
@@ -219,7 +249,17 @@ class ErpOrderService
         ];
     }
 
-    public function getOrder(string $orderId): ?array
+    public function getOrder(string $orderId, ?string $company = null): ?array
+    {
+        $this->usingCompany($company);
+        try {
+            return $this->getOrderInternal($orderId);
+        } finally {
+            $this->usingCompany(null);
+        }
+    }
+
+    private function getOrderInternal(string $orderId): ?array
     {
         if ($this->useMock()) {
             return collect($this->mockOrders())->firstWhere('id', $orderId)
@@ -355,10 +395,15 @@ class ErpOrderService
         return $this->spire->testConnection();
     }
 
-    public function dashboardSummary(?User $user = null): array
+    public function dashboardSummary(?User $user = null, ?string $company = null): array
     {
         // Same list window as Orders page so counters and row counts stay aligned.
-        $result = $this->listOrders($user, ['limit' => 200, 'page' => 1, 'fresh' => true]);
+        $result = $this->listOrders($user, [
+            'limit' => 200,
+            'page' => 1,
+            'fresh' => true,
+            'company' => $company ?? SpireCompany::DEFAULT_SLUG,
+        ]);
         $orders = $result['data'] ?? [];
 
         $sortedOrders = collect($orders)

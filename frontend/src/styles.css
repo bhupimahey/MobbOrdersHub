@@ -299,6 +299,62 @@ h4 {
   grid-column: 2;
 }
 
+.company-switcher {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.company-switcher-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.company-switcher-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.company-switcher-btn {
+  min-width: 72px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: #fff;
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.company-switcher-btn.is-active {
+  background: #1e3a5f;
+  border-color: #1e3a5f;
+  color: #fff;
+}
+
+.company-switcher-btn:hover:not(:disabled):not(.is-active) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.company-switcher-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .back-to-top {
   position: fixed;
   right: 22px;

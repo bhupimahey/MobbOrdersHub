@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate, useParams } from 'react-router-dom'
 import {
   Activity,
   ClipboardList,
@@ -9,14 +9,15 @@ import {
   Users,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { DEFAULT_COMPANY, resolveCompanySlug } from '../lib/companies'
 import { prefetchRoute } from '../lib/pageCache'
 import BackToTop from './BackToTop'
 
 const LOGO = '/mobb-logo.png'
 
 function warm(path: string) {
-  if (path === '/dashboard') prefetchRoute(() => import('../pages/DashboardPage'))
-  if (path === '/orders') prefetchRoute(() => import('../pages/OrdersPage'))
+  if (path.startsWith('/dashboard')) prefetchRoute(() => import('../pages/DashboardPage'))
+  if (path.startsWith('/orders')) prefetchRoute(() => import('../pages/OrdersPage'))
   if (path === '/users') prefetchRoute(() => import('../pages/UsersPage'))
   if (path === '/activity') prefetchRoute(() => import('../pages/ActivityPage'))
   if (path === '/settings') prefetchRoute(() => import('../pages/SettingsPage'))
@@ -26,7 +27,11 @@ function warm(path: string) {
 export default function AppLayout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const { company: companyParam } = useParams()
+  const company = resolveCompanySlug(companyParam ?? DEFAULT_COMPANY)
   const isAdmin = user?.is_super_admin
+  const dashboardPath = `/dashboard/${company}`
+  const ordersPath = `/orders/${company}`
 
   const handleLogout = () => {
     logout()
@@ -44,21 +49,21 @@ export default function AppLayout() {
 
         <nav className="nav-list">
           <NavLink
-            to="/dashboard"
+            to={dashboardPath}
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
             title="Dashboard"
             data-tip="Dashboard"
-            onMouseEnter={() => warm('/dashboard')}
+            onMouseEnter={() => warm(dashboardPath)}
           >
             <LayoutDashboard size={20} strokeWidth={1.75} />
           </NavLink>
 
           <NavLink
-            to="/orders"
+            to={ordersPath}
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
             title="Orders"
             data-tip="Orders"
-            onMouseEnter={() => warm('/orders')}
+            onMouseEnter={() => warm(ordersPath)}
           >
             <ClipboardList size={20} strokeWidth={1.75} />
           </NavLink>
