@@ -1,7 +1,6 @@
 import { rangeForPeriod, type DatePeriod } from './datePresets'
-import type { CompanySlug } from './companies'
 
-const PREFIX = 'san_company_filters:'
+const PREFIX = 'san_listing_filters:'
 
 export type DashboardFilters = {
   search: string
@@ -48,18 +47,18 @@ export function defaultOrdersFilters(): OrdersFilters {
   }
 }
 
-export function readDashboardFilters(company: CompanySlug): DashboardFilters {
-  const saved = readJson<Partial<DashboardFilters>>(`dashboard:${company}`)
+/** Shared across MOBB/HHC — company switch keeps the same filter selection. */
+export function readDashboardFilters(): DashboardFilters {
+  const saved = readJson<Partial<DashboardFilters>>('dashboard')
   return {
     ...defaultDashboardFilters(),
-    ...(saved ?? {}),
     search: typeof saved?.search === 'string' ? saved.search : '',
     status: typeof saved?.status === 'string' ? saved.status : 'all',
   }
 }
 
-export function writeDashboardFilters(company: CompanySlug, filters: DashboardFilters): void {
-  writeJson(`dashboard:${company}`, filters)
+export function writeDashboardFilters(filters: DashboardFilters): void {
+  writeJson('dashboard', filters)
 }
 
 const ORDER_PERIODS: DatePeriod[] = [
@@ -70,8 +69,8 @@ const ORDER_PERIODS: DatePeriod[] = [
   'custom',
 ]
 
-export function readOrdersFilters(company: CompanySlug): OrdersFilters {
-  const saved = readJson<Partial<OrdersFilters>>(`orders:${company}`)
+export function readOrdersFilters(): OrdersFilters {
+  const saved = readJson<Partial<OrdersFilters>>('orders')
   const defaults = defaultOrdersFilters()
   if (!saved) return defaults
 
@@ -99,6 +98,6 @@ export function readOrdersFilters(company: CompanySlug): OrdersFilters {
   }
 }
 
-export function writeOrdersFilters(company: CompanySlug, filters: OrdersFilters): void {
-  writeJson(`orders:${company}`, filters)
+export function writeOrdersFilters(filters: OrdersFilters): void {
+  writeJson('orders', filters)
 }

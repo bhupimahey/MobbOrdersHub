@@ -12,7 +12,7 @@ import {
   rangeForPeriod,
   type DatePeriod,
 } from '../lib/datePresets'
-import { pageCacheKey, resolveCompanySlug, type CompanySlug } from '../lib/companies'
+import { pageCacheKey, resolveCompanySlug } from '../lib/companies'
 import {
   readOrdersFilters,
   writeOrdersFilters,
@@ -29,14 +29,9 @@ const PAGE_SIZE = 200
 export default function OrdersPage() {
   const { company: companyParam } = useParams()
   const company = resolveCompanySlug(companyParam)
-  // Remount per company so filters initialize from that company's saved selection.
-  return <OrdersPageBody key={company} company={company} />
-}
-
-function OrdersPageBody({ company }: { company: CompanySlug }) {
   const cacheKey = pageCacheKey('orders', company)
   const cached = readPageCache<{ orders: Order[]; usingMock: boolean }>(cacheKey, 15_000)
-  const initialFilters = readOrdersFilters(company)
+  const initialFilters = readOrdersFilters()
   const [allOrders, setAllOrders] = useState<Order[]>(cached?.orders ?? [])
   const [search, setSearch] = useState(initialFilters.search)
   const [status, setStatus] = useState(initialFilters.status)
@@ -48,9 +43,19 @@ function OrdersPageBody({ company }: { company: CompanySlug }) {
   const [error, setError] = useState('')
   const hasLoadedOnceRef = useRef(Boolean(cached))
 
+  // Company change: swap data only — keep current filters applied to the new company.
   useEffect(() => {
-    writeOrdersFilters(company, { search, status, period, dateFrom, dateTo })
-  }, [company, search, status, period, dateFrom, dateTo])
+    const next = readPageCache<{ orders: Order[]; usingMock: boolean }>(cacheKey, 15_000)
+    setAllOrders(next?.orders ?? [])
+    setPage(1)
+    setError('')
+    hasLoadedOnceRef.current = Boolean(next)
+    setLoading(!next)
+  }, [company, cacheKey])
+
+  useEffect(() => {
+    writeOrdersFilters({ search, status, period, dateFrom, dateTo })
+  }, [search, status, period, dateFrom, dateTo])
 
   const loadOrders = useCallback(async (opts?: { silent?: boolean }) => {
     const silent = Boolean(opts?.silent)

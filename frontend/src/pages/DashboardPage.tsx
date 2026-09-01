@@ -21,7 +21,6 @@ import {
   dashCacheKey,
   pageCacheKey,
   resolveCompanySlug,
-  type CompanySlug,
 } from '../lib/companies'
 import {
   readDashboardFilters,
@@ -64,21 +63,24 @@ function todayTorontoYmd(): string {
 export default function DashboardPage() {
   const { company: companyParam } = useParams()
   const company = resolveCompanySlug(companyParam)
-  return <DashboardPageBody key={company} company={company} />
-}
-
-function DashboardPageBody({ company }: { company: CompanySlug }) {
   const cfg = companyConfig(company)
   const cached = readDashboardCache(company)
-  const initialFilters = readDashboardFilters(company)
+  const initialFilters = readDashboardFilters()
   const [data, setData] = useState<DashboardData | null>(cached)
   const [search, setSearch] = useState(initialFilters.search)
   const [status, setStatus] = useState(initialFilters.status)
   const [loading, setLoading] = useState(!cached)
 
+  // Company change: swap data only — keep current filters applied to the new company.
   useEffect(() => {
-    writeDashboardFilters(company, { search, status })
-  }, [company, search, status])
+    const next = readDashboardCache(company)
+    setData(next)
+    setLoading(!next)
+  }, [company])
+
+  useEffect(() => {
+    writeDashboardFilters({ search, status })
+  }, [search, status])
 
   const loadDashboard = useCallback(async () => {
     setLoading(true)
