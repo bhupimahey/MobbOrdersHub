@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import api from '../api/client'
 import CompanySwitcher from '../components/CompanySwitcher'
+import DateRangeFilter from '../components/DateRangeFilter'
 import WorkflowStepper from '../components/WorkflowStepper'
 import OrdersTable from '../components/OrdersTable'
 import PageLoader from '../components/PageLoader'
@@ -26,8 +27,13 @@ import {
   readDashboardFilters,
   writeDashboardFilters,
 } from '../lib/companyFilters'
+import {
+  DATE_PERIOD_OPTIONS,
+  rangeForPeriod,
+  type DatePeriod,
+} from '../lib/datePresets'
 import { matchesStatusFilter, STATUS_FILTER_OPTIONS } from '../lib/orderStatusFilter'
-import { matchesOrderSearch } from '../lib/orderSearch'
+import { listingDay, matchesOrderSearch } from '../lib/orderSearch'
 import { readPageCache, writePageCache } from '../lib/pageCache'
 import { ORDERS_POLL_MS, usePollingWhenVisible } from '../lib/usePollingWhenVisible'
 import type { DashboardData, Order } from '../types'
@@ -69,6 +75,9 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(cached)
   const [search, setSearch] = useState(initialFilters.search)
   const [status, setStatus] = useState(initialFilters.status)
+  const [period, setPeriod] = useState<DatePeriod>(initialFilters.period)
+  const [dateFrom, setDateFrom] = useState(initialFilters.dateFrom)
+  const [dateTo, setDateTo] = useState(initialFilters.dateTo)
   const [loading, setLoading] = useState(!cached)
 
   // Company change: swap data only — keep current filters applied to the new company.
@@ -79,8 +88,8 @@ export default function DashboardPage() {
   }, [company])
 
   useEffect(() => {
-    writeDashboardFilters({ search, status })
-  }, [search, status])
+    writeDashboardFilters({ search, status, period, dateFrom, dateTo })
+  }, [search, status, period, dateFrom, dateTo])
 
   const loadDashboard = useCallback(async () => {
     setLoading(true)
@@ -104,6 +113,14 @@ export default function DashboardPage() {
     void loadDashboard()
   }, ORDERS_POLL_MS)
 
+  const onPeriodChange = (next: DatePeriod) => {
+    setPeriod(next)
+    if (next === 'custom') return
+    const range = rangeForPeriod(next)
+    setDateFrom(range.from)
+    setDateTo(range.to)
+  }
+
   const orders = useMemo(() => {
     let list: Order[] = data?.orders ?? []
     if (status !== 'all') {
@@ -112,10 +129,12 @@ export default function DashboardPage() {
     if (search.trim()) {
       list = list.filter((o) => matchesOrderSearch(o, search))
     }
+    if (dateFrom) list = list.filter((o) => listingDay(o) >= dateFrom)
+    if (dateTo) list = list.filter((o) => listingDay(o) <= dateTo)
     return [...list].sort((a, b) =>
-      (b.order_date || '').localeCompare(a.order_date || ''),
+      (listingDay(b) + (b.order_date || '')).localeCompare(listingDay(a) + (a.order_date || '')),
     )
-  }, [data, search, status])
+  }, [data, search, status, dateFrom, dateTo])
 
   const stats = data?.stats ?? {
     total_orders: 0,
@@ -163,7 +182,7 @@ export default function DashboardPage() {
             </span>
           </div>
         </div>
-        <div className="toolbar">
+        <div className="toolbar orders-toolbar">
           <div className="search-wrap">
             <Search size={15} className="search-icon" />
             <input
@@ -180,6 +199,30 @@ export default function DashboardPage() {
               </option>
             ))}
           </select>
+          <select
+            className="select orders-period-select"
+            value={period}
+            onChange={(e) => onPeriodChange(e.target.value as DatePeriod)}
+            aria-label="Date period"
+          >
+            {DATE_PERIOD_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <div className={`orders-custom-range ${period === 'custom' ? 'is-visible' : ''}`}>
+            {period === 'custom' ? (
+              <DateRangeFilter
+                dateFrom={dateFrom}
+                dateTo={dateTo}
+                onChange={(from, to) => {
+                  setDateFrom(from)
+                  setDateTo(to)
+                }}
+              />
+            ) : null}
+          </div>
         </div>
       </div>
 

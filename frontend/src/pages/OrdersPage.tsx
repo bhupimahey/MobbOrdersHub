@@ -63,7 +63,7 @@ export default function OrdersPage() {
     if (!silent) setError('')
     try {
       const { data } = await api.get('/orders', {
-        params: { limit: 200, page: 1, fresh: 1, company },
+        params: { limit: 500, page: 1, fresh: 1, company },
       })
       const list = data.data ?? []
       setAllOrders(list)

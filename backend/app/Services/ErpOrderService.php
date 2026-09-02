@@ -75,20 +75,14 @@ class ErpOrderService
             SpireApiClient::flushOrderCache();
         }
 
-        $limit = max(1, min(200, (int) ($filters['limit'] ?? 50)));
+        // Pull enough open SOs for year-to-date listings. Spire often returns oldest-first;
+        // listRecentSalesOrders merges head+tail pages so current HHC/MOBB orders are not buried.
+        $limit = max(1, min(500, (int) ($filters['limit'] ?? 200)));
         $page = max(1, (int) ($filters['page'] ?? 1));
         $start = ($page - 1) * $limit;
 
-        $query = [
-            'start' => $start,
-            'limit' => $limit,
-        ];
-
-        if (! empty($filters['search'])) {
-            $query['q'] = $filters['search'];
-        }
-
-        $result = $this->spire->listSalesOrders($query, $fresh);
+        $search = ! empty($filters['search']) ? (string) $filters['search'] : null;
+        $result = $this->spire->listRecentSalesOrders($limit, $fresh, $search);
 
         if (! empty($result['error'])) {
             return [
@@ -399,7 +393,7 @@ class ErpOrderService
     {
         // Same list window as Orders page so counters and row counts stay aligned.
         $result = $this->listOrders($user, [
-            'limit' => 200,
+            'limit' => 500,
             'page' => 1,
             'fresh' => true,
             'company' => $company ?? SpireCompany::DEFAULT_SLUG,

@@ -500,6 +500,177 @@ class SpireApiClient
         });
     }
 
+    /**
+     * Open sales orders for Hub listings (newest first).
+     *
+     * Many Spire builds return sales/orders oldest-first. Taking start=0&limit=200 then
+     * hides current open SOs behind a backlog of old open/test orders (seen on HHC).
+     * Pull both ends of the list, merge a short day-scan, then keep the newest rows.
+     */
+    public function listRecentSalesOrders(int $limit = 200, bool $fresh = false, ?string $search = null): array
+    {
+        $limit = max(1, min(500, $limit));
+        $search = $search !== null ? trim($search) : '';
+
+        if ($search !== '') {
+            return $this->listSalesOrders([
+                'start' => 0,
+                'limit' => $limit,
+                'q' => $search,
+            ], $fresh);
+        }
+
+        $error = null;
+        $byId = [];
+
+        $probe = $this->listSalesOrders(['start' => 0, 'limit' => 1], $fresh);
+        if (! empty($probe['error'])) {
+            return $probe;
+        }
+
+        $spireCount = (int) ($probe['count'] ?? 0);
+        $window = max($limit, 300);
+        $pageSize = 100;
+
+        // Window A: first pages (correct when Spire is newest-first).
+        foreach ($this->fetchSalesOrderPageWindow(0, $window, $pageSize, $fresh, $error) as $row) {
+            $this->indexSalesOrderRow($byId, $row);
+        }
+
+        // Window B: last pages (correct when Spire is oldest-first — HHC case).
+        if ($spireCount > $window) {
+            $tailStart = max(0, $spireCount - $window);
+            foreach ($this->fetchSalesOrderPageWindow($tailStart, $window, $pageSize, $fresh, $error) as $row) {
+                $this->indexSalesOrderRow($byId, $row);
+            }
+        }
+
+        // Day scan: recent orderDate filters catch today's open SOs even if pagination misses them.
+        try {
+            $tz = new \DateTimeZone('America/Toronto');
+            $cursor = new \DateTimeImmutable('now', $tz);
+            for ($i = 0; $i < 21; $i++) {
+                $day = $cursor->format('Y-m-d');
+                $dayResult = $this->listSalesOrders([
+                    'start' => 0,
+                    'limit' => 100,
+                    'filter' => ['orderDate' => $day],
+                ], $fresh);
+                if (! empty($dayResult['error']) && $error === null) {
+                    $error = $dayResult['error'];
+                }
+                foreach ($dayResult['records'] ?? [] as $row) {
+                    if (is_array($row)) {
+                        $this->indexSalesOrderRow($byId, $row);
+                    }
+                }
+                $cursor = $cursor->modify('-1 day');
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Spire sales order day scan failed', ['message' => $e->getMessage()]);
+        }
+
+        if ($byId !== [] && $error !== null) {
+            $error = null;
+        }
+
+        $records = array_values($byId);
+        usort($records, function ($a, $b) {
+            $da = $this->orderRowDateYmd($a) ?? '';
+            $db = $this->orderRowDateYmd($b) ?? '';
+            if ($da !== $db) {
+                return $db <=> $da;
+            }
+
+            return strcmp((string) ($b['orderNo'] ?? ''), (string) ($a['orderNo'] ?? ''));
+        });
+
+        if (count($records) > $limit) {
+            $records = array_slice($records, 0, $limit);
+        }
+
+        Log::info('Spire recent sales orders merge', [
+            'company' => $this->company(),
+            'spire_count' => $spireCount,
+            'merged' => count($byId),
+            'kept' => count($records),
+            'error' => $error,
+        ]);
+
+        return [
+            'records' => $records,
+            'count' => $spireCount > 0 ? $spireCount : count($records),
+            'error' => $error,
+            'start' => 0,
+            'limit' => $limit,
+        ];
+    }
+
+    /**
+     * @param  array<string, array<string, mixed>>  $byId
+     * @param  array<string, mixed>  $row
+     */
+    private function indexSalesOrderRow(array &$byId, array $row): void
+    {
+        $id = (string) ($row['id'] ?? $row['orderNo'] ?? '');
+        if ($id === '') {
+            $id = 'row:'.md5(json_encode($row));
+        }
+        $byId[$id] = $row;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function fetchSalesOrderPageWindow(
+        int $start,
+        int $need,
+        int $pageSize,
+        bool $fresh,
+        ?string &$error,
+    ): array {
+        $records = [];
+        $cursor = max(0, $start);
+        $maxPages = (int) ceil($need / $pageSize) + 1;
+
+        for ($page = 0; $page < $maxPages && count($records) < $need; $page++) {
+            $result = $this->listSalesOrders([
+                'start' => $cursor,
+                'limit' => $pageSize,
+            ], $fresh);
+            if (! empty($result['error'])) {
+                $error = $result['error'];
+                break;
+            }
+            $chunk = is_array($result['records'] ?? null) ? $result['records'] : [];
+            if ($chunk === []) {
+                break;
+            }
+            array_push($records, ...$chunk);
+            $cursor += count($chunk);
+            if (count($chunk) < $pageSize) {
+                break;
+            }
+        }
+
+        return $records;
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function orderRowDateYmd(array $row): ?string
+    {
+        foreach (['orderDate', 'OrderDate', 'date', 'created', 'modified'] as $field) {
+            $day = $this->spireDateToTorontoYmd($row[$field] ?? null);
+            if ($day !== null) {
+                return $day;
+            }
+        }
+
+        return null;
+    }
+
     private function fetchSalesOrdersList(array $query): array
     {
         $response = $this->get($this->companyPath('sales/orders/'), $query);

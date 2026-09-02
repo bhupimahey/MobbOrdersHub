@@ -1,10 +1,14 @@
 import { rangeForPeriod, type DatePeriod } from './datePresets'
 
-const PREFIX = 'san_listing_filters:'
+/** Bumped so prior "today" defaults do not stick after YTD default change. */
+const PREFIX = 'san_listing_filters_ytd:'
 
 export type DashboardFilters = {
   search: string
   status: string
+  period: DatePeriod
+  dateFrom: string
+  dateTo: string
 }
 
 export type OrdersFilters = {
@@ -32,16 +36,58 @@ function writeJson(key: string, data: unknown): void {
   }
 }
 
-export function defaultDashboardFilters(): DashboardFilters {
-  return { search: '', status: 'all' }
+const ORDER_PERIODS: DatePeriod[] = [
+  'today',
+  'this_month',
+  'last_6_months',
+  'this_year',
+  'custom',
+]
+
+function defaultDateFilters(): Pick<OrdersFilters, 'period' | 'dateFrom' | 'dateTo'> {
+  const range = rangeForPeriod('this_year')
+  return {
+    period: 'this_year',
+    dateFrom: range.from,
+    dateTo: range.to,
+  }
 }
 
-export function defaultOrdersFilters(): OrdersFilters {
-  const range = rangeForPeriod('today')
+export function defaultDashboardFilters(): DashboardFilters {
   return {
     search: '',
     status: 'all',
-    period: 'today',
+    ...defaultDateFilters(),
+  }
+}
+
+export function defaultOrdersFilters(): OrdersFilters {
+  return {
+    search: '',
+    status: 'all',
+    ...defaultDateFilters(),
+  }
+}
+
+function resolveDateFilters(saved: Partial<OrdersFilters> | null): Pick<OrdersFilters, 'period' | 'dateFrom' | 'dateTo'> {
+  const defaults = defaultDateFilters()
+  if (!saved) return defaults
+
+  const period = (ORDER_PERIODS.includes(saved.period as DatePeriod)
+    ? saved.period
+    : 'this_year') as DatePeriod
+
+  if (period === 'custom') {
+    return {
+      period: 'custom',
+      dateFrom: typeof saved.dateFrom === 'string' ? saved.dateFrom : defaults.dateFrom,
+      dateTo: typeof saved.dateTo === 'string' ? saved.dateTo : defaults.dateTo,
+    }
+  }
+
+  const range = rangeForPeriod(period)
+  return {
+    period,
     dateFrom: range.from,
     dateTo: range.to,
   }
@@ -51,9 +97,9 @@ export function defaultOrdersFilters(): OrdersFilters {
 export function readDashboardFilters(): DashboardFilters {
   const saved = readJson<Partial<DashboardFilters>>('dashboard')
   return {
-    ...defaultDashboardFilters(),
     search: typeof saved?.search === 'string' ? saved.search : '',
     status: typeof saved?.status === 'string' ? saved.status : 'all',
+    ...resolveDateFilters(saved),
   }
 }
 
@@ -61,40 +107,12 @@ export function writeDashboardFilters(filters: DashboardFilters): void {
   writeJson('dashboard', filters)
 }
 
-const ORDER_PERIODS: DatePeriod[] = [
-  'today',
-  'this_month',
-  'last_6_months',
-  'this_year',
-  'custom',
-]
-
 export function readOrdersFilters(): OrdersFilters {
   const saved = readJson<Partial<OrdersFilters>>('orders')
-  const defaults = defaultOrdersFilters()
-  if (!saved) return defaults
-
-  const period = (ORDER_PERIODS.includes(saved.period as DatePeriod)
-    ? saved.period
-    : 'today') as DatePeriod
-
-  if (period === 'custom') {
-    return {
-      search: typeof saved.search === 'string' ? saved.search : '',
-      status: typeof saved.status === 'string' ? saved.status : 'all',
-      period: 'custom',
-      dateFrom: typeof saved.dateFrom === 'string' ? saved.dateFrom : defaults.dateFrom,
-      dateTo: typeof saved.dateTo === 'string' ? saved.dateTo : defaults.dateTo,
-    }
-  }
-
-  const range = rangeForPeriod(period)
   return {
-    search: typeof saved.search === 'string' ? saved.search : '',
-    status: typeof saved.status === 'string' ? saved.status : 'all',
-    period,
-    dateFrom: range.from,
-    dateTo: range.to,
+    search: typeof saved?.search === 'string' ? saved.search : '',
+    status: typeof saved?.status === 'string' ? saved.status : 'all',
+    ...resolveDateFilters(saved),
   }
 }
 
